@@ -153,3 +153,242 @@ Carr, P., & Wu, L. (2009). Variance risk premiums. *Review of Financial Studies*
 Demeterfi, K., Derman, E., Kamal, M., & Zou, J. (1999). *More than you ever wanted to know about volatility swaps*. Goldman Sachs Quantitative Strategies Research Notes.
 
 Gatheral, J. (2006). *The volatility surface: A practitioner's guide*. Wiley Finance.
+
+---
+
+# W1: Literature Review — Contemporary Frontier Topics in Volatility Modelling
+
+## Participant 2 Contribution
+
+This section extends the classical literature review above with the contemporary research frontier relevant to variance swaps, VIX options, rough volatility, joint SPX--VIX calibration, and empirical realised-variance estimation. The classical sources explain why variance can be traded, how VIX is linked to option prices, and why one-factor stochastic volatility models are analytically convenient. The newer literature asks where those models break down and what methods are now used to repair the gap between theory and market data.
+
+The main post-2015 developments are threefold. First, empirical studies show that volatility is much rougher than standard Markovian stochastic-volatility models imply, with a Hurst exponent around $H \approx 0.1$ rather than the Brownian value $H = 1/2$. Second, one-factor models such as Heston struggle to fit SPX options and VIX options simultaneously because VIX becomes too tightly linked to one state variable. Third, high-frequency realised variance is severely biased by market microstructure noise, so modern variance risk premium work needs robust estimators such as realised kernels rather than naive tick-by-tick realised variance.
+
+---
+
+## 7. Rough Volatility and the VIX Modelling Frontier
+
+### 7.1 Empirical Motivation
+
+Gatheral, Jaisson and Rosenbaum (2018) document that volatility is "rough": the regularity of log-volatility is far below that of a standard Brownian diffusion. A typical empirical scaling relation is
+
+$$
+\mathbb{E}\left[|\log \sigma_{t+\Delta} - \log \sigma_t|^q\right] \sim \Delta^{qH},
+$$
+
+with estimates of $H$ on equity-index data often around $0.05$ to $0.15$. This is a direct challenge to Heston-type models, where the instantaneous variance process is Markovian and Brownian-driven:
+
+$$
+dv_t = \kappa(\theta - v_t)\,dt + \xi\sqrt{v_t}\,dB_t.
+$$
+
+In such a model, the path regularity is Brownian-like. The data instead imply much more irregular volatility paths, which helps explain why classical models often understate short-maturity skew.
+
+### 7.2 Short-Time Skew in Rough Models
+
+Bayer, Friz and Gatheral (2016), together with related work on short-time asymptotics, show that rough volatility naturally explains the steep short-maturity SPX implied-volatility skew. Empirically, near-the-money skew behaves approximately as
+
+$$
+\left|\frac{\partial \sigma_{\mathrm{IV}}(K,T)}{\partial \log K}\right|_{K=S} \sim T^{H-1/2}.
+$$
+
+When $H \approx 0.1$, the skew explodes approximately like $T^{-0.4}$ as maturity approaches zero. In classical Heston, corresponding to Brownian regularity, the short-time skew does not reproduce this empirical explosion in the same way.
+
+### 7.3 Rough Bergomi and VIX
+
+The rough Bergomi model is a central benchmark in this literature. In simplified form,
+
+$$
+\frac{dS_t}{S_t} = \sqrt{v_t}\,dW_t,
+$$
+
+$$
+v_t = \xi_0(t)\exp\left(\eta \widetilde{W}_t^H - \frac{1}{2}\eta^2t^{2H}\right),
+$$
+
+where
+
+$$
+\widetilde{W}_t^H = \sqrt{2H}\int_0^t (t-s)^{H-1/2}\,dZ_s.
+$$
+
+Here $Z$ is correlated with the Brownian motion driving the stock price, and $\xi_0(t)$ is the initial forward variance curve. The VIX is then linked to the conditional expectation of future integrated variance:
+
+$$
+\mathrm{VIX}_t^2 = \frac{1}{\Delta}\mathbb{E}_t\int_t^{t+\Delta} v_s\,ds,
+\qquad \Delta = 30/365.
+$$
+
+The difficulty is that rough Bergomi is non-Markovian: $v_s$ depends on the past path of the fractional process, not just on a finite-dimensional state variable. This makes VIX option pricing, hedging, and calibration computationally demanding.
+
+### 7.4 Deep Learning Volatility Calibration
+
+Horvath, Muguruza and Tomas (2021) address the computational bottleneck in calibrating rough volatility models. Their main contribution is to use neural networks as fast approximators for the pricing and calibration maps. Conceptually, the workflow is
+
+$$
+\theta = (H,\eta,\rho,\xi_0)
+\quad \longrightarrow \quad
+\sigma_{\mathrm{IV}}(K,T)
+\quad \longrightarrow \quad
+\hat{\theta}.
+$$
+
+The first neural network approximates the map from model parameters to implied-volatility surfaces, using synthetic training data generated offline by expensive Monte Carlo simulation. The second network approximates the inverse calibration map from observed surfaces back to model parameters. This makes real-time calibration of rough models much more feasible and is especially relevant for testing whether such models can fit SPX and VIX smiles jointly.
+
+---
+
+## 8. Joint SPX--VIX Calibration and the Limits of One-Factor Models
+
+### 8.1 The Structural Problem
+
+The classical Heston framework has a single latent variance factor $v_t$. Under Heston, $\mathrm{VIX}_t^2$ is an affine function of $v_t$, so SPX options, VIX futures, and VIX options are all forced to depend on the same state variable. This gives tractability, but it is also the reason the model is too rigid.
+
+Guyon (2020) formalises this failure through an inversion of convex ordering in the VIX market. For a broad class of one-factor diffusion models,
+
+$$
+\frac{dS_t}{S_t} = \sqrt{f(X_t)}\,dW_t,
+\qquad
+dX_t = \mu(X_t)\,dt + \sigma(X_t)\,dB_t,
+$$
+
+the model implies restrictions between the SPX surface and the VIX option surface. In market data, these restrictions are systematically violated. In practical terms, a one-factor model calibrated to SPX options tends to underprice VIX option volatility, especially the right tail of the VIX smile.
+
+### 8.2 Proposed Solutions
+
+The literature has proposed several ways to escape the one-factor restriction:
+
+| Approach | Representative source | Main idea | Joint SPX--VIX fit |
+| --- | --- | --- | --- |
+| Two-factor Bergomi | Bergomi (2008) | Use multiple forward-variance factors | Partial improvement |
+| Heston with jumps | Pacati et al. (2018) | Add jumps to variance dynamics | Better, but parameter-heavy |
+| Quadratic rough Heston | Gatheral, Jusselin and Rosenbaum (2020) | Combine roughness with nonlinear variance | Strong joint fit |
+| Path-dependent volatility | Guyon and Lekeufack (2023) | Make volatility a functional of past SPX returns | Strong empirical fit |
+
+Gatheral, Jusselin and Rosenbaum (2020) propose the quadratic rough Heston model:
+
+$$
+v_t = a(Z_t - b)^2 + c,
+$$
+
+where
+
+$$
+Z_t = \int_0^t \frac{(t-s)^{H-1/2}}{\Gamma(H+1/2)}
+\left(\theta(s)\,ds + \eta\,dW_s\right).
+$$
+
+The quadratic transformation of a rough Volterra process gives the model enough flexibility to generate asymmetric skew and stronger VIX option volatility without introducing a large number of separate factors.
+
+Guyon and Lekeufack (2023) take a different route: they show that volatility can be modelled as largely path-dependent on past SPX returns. A schematic representation is
+
+$$
+v_t =
+\beta_0
++ \beta_1\int_0^t K_1(t-s)\frac{dS_s}{S_s}
++ \beta_2\int_0^t K_2(t-s)\left(\frac{dS_s}{S_s}\right)^2.
+$$
+
+This approach suggests that much of volatility dynamics may be reconstructed from trend and realised-volatility features of the index itself, rather than from a separate hidden Markov factor.
+
+---
+
+## 9. Realised Kernels and High-Frequency Variance Estimation
+
+### 9.1 Why Naive Realised Variance Fails
+
+For the empirical part of the project, the target quantity is integrated variance:
+
+$$
+IV_T = \int_0^T \sigma_s^2\,ds.
+$$
+
+If efficient prices were observed without noise, realised variance would be consistent:
+
+$$
+RV_n = \sum_{i=1}^{n}
+\left(\log P_{t_i} - \log P_{t_{i-1}}\right)^2
+\xrightarrow{p} IV_T.
+$$
+
+In high-frequency data, however, observed prices include microstructure noise:
+
+$$
+\log P_{t_i} = \log P^*_{t_i} + \varepsilon_i.
+$$
+
+The noise term comes from bid-ask bounce, tick-size discreteness, asynchronous trading, and other market frictions. Under this observation equation,
+
+$$
+\mathbb{E}[RV_n] = IV_T + 2n\,\mathbb{E}[\varepsilon^2],
+$$
+
+so tick-by-tick realised variance diverges as the sampling frequency increases. This is the high-frequency variance estimation problem: more observations can make the naive estimator worse.
+
+### 9.2 Realised Kernel Estimators
+
+Barndorff-Nielsen, Hansen, Lunde and Shephard (2008, 2011) propose realised kernels as a robust solution. The estimator combines return autocovariances with kernel weights:
+
+$$
+RK = \gamma_0 + \sum_{h=1}^{H} k\left(\frac{h-1}{H}\right)(\gamma_h + \gamma_{-h}),
+$$
+
+where
+
+$$
+\gamma_h = \sum_{i=1}^{n-h} r_i r_{i+h},
+\qquad
+r_i = \log P_{t_i} - \log P_{t_{i-1}}.
+$$
+
+The term $\gamma_0$ is the usual realised variance, while the autocovariance terms offset the bias generated by market microstructure noise. Common choices include Parzen and Tukey-Hanning kernels. The bandwidth $H$ controls how many autocovariance lags are included, with optimal rates often of order $H \propto n^{3/5}$ under standard assumptions.
+
+The key properties are consistency under noisy observations, robustness to some forms of autocorrelated noise, and the ability to construct positive semi-definite multivariate covariance estimates when appropriate kernels are used. This makes realised kernels more suitable than naive high-frequency realised variance for estimating the physical component of the variance risk premium.
+
+### 9.3 Link to VIX and the Variance Risk Premium
+
+The variance risk premium can be written as
+
+$$
+\mathrm{VRP}_t =
+\underbrace{\mathbb{E}^{\mathbb{Q}}[IV_{t,t+\Delta}]}_{\text{approximately } \mathrm{VIX}^2}
+-
+\underbrace{\mathbb{E}^{\mathbb{P}}[IV_{t,t+\Delta}]}_{\text{estimated from realised variance measures}}.
+$$
+
+VIX gives a risk-neutral expectation of future variance, while realised kernels provide a cleaner empirical estimate of physical realised variance from high-frequency data. Therefore, the realised-kernel literature is directly connected to the Carr and Wu variance risk premium framework reviewed above.
+
+For the project, the natural empirical workflow is:
+
+1. Obtain high-frequency SPX or SPY data.
+2. Estimate daily integrated variance using a realised kernel, such as the Parzen kernel.
+3. Compare the realised-kernel estimate with naive 5-minute realised variance.
+4. Annualise the estimates and compare them with $\mathrm{VIX}^2$.
+5. Study VRP dynamics during stress periods such as COVID-19 in 2020, the inflation and rate-hike period of 2022, and the banking stress episode of 2023.
+
+---
+
+## 10. Synthesis: How the Classical and Frontier Literatures Connect
+
+The classical literature establishes the project foundation: Demeterfi et al. explain why variance can be replicated from options; Carr and Wu turn the difference between implied and realised variance into an empirical risk premium; Bergomi shows why forward variance is the natural state variable for volatility derivatives; and Gatheral provides the analytical Heston and VIX machinery.
+
+The contemporary literature explains why these foundations are not enough. Rough volatility improves the description of short-maturity skew and volatility path regularity. Joint SPX--VIX calibration results show that one-factor models are too restrictive for VIX options. Realised kernels solve the empirical problem that naive high-frequency realised variance is biased by market microstructure noise. Together, these frontier topics define the Participant 2 contribution to the group project: connecting modern rough-volatility models and robust realised-variance estimation to the pricing and empirical analysis of variance swaps and VIX options.
+
+---
+
+## Additional References for Participant 2
+
+Barndorff-Nielsen, O. E., Hansen, P. R., Lunde, A., & Shephard, N. (2008). Designing realised kernels to measure the ex-post variation of equity prices in the presence of noise. *Econometrica*, 76(6), 1481--1536.
+
+Barndorff-Nielsen, O. E., Hansen, P. R., Lunde, A., & Shephard, N. (2011). Multivariate realised kernels: consistent positive semi-definite estimators of the covariation of equity prices with noise and non-synchronous trading. *Journal of Econometrics*, 162(2), 149--169.
+
+Bayer, C., Friz, P., & Gatheral, J. (2016). Pricing under rough volatility. *Quantitative Finance*, 16(6), 887--904.
+
+Gatheral, J., Jaisson, T., & Rosenbaum, M. (2018). Volatility is rough. *Quantitative Finance*, 18(6), 933--949.
+
+Gatheral, J., Jusselin, P., & Rosenbaum, M. (2020). The quadratic rough Heston model. *Risk Magazine*.
+
+Guyon, J. (2020). The joint SPX--VIX smile calibration puzzle solved. *Risk Magazine*.
+
+Guyon, J., & Lekeufack, J. (2023). Volatility is mostly path-dependent. *Quantitative Finance*.
+
+Horvath, B., Muguruza, A., & Tomas, M. (2021). Deep learning volatility. *Quantitative Finance*, 21(1), 11--27.
