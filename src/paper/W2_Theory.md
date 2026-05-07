@@ -74,51 +74,102 @@ where $A = \bar{v}\left(1 - \frac{1-e^{-\kappa\Delta}}{\kappa\Delta}\right)$ and
 **This is affine in $v_t$** — VIX² is a linear function of instantaneous variance.
 
 ---
+
 ## 4. CIR Characteristic Function for Integrated Variance
 
 ### Motivation
 
-To price VIX futures and VIX options using Fourier-based pricing methods such as the COS method, we require the characteristic function of the integrated variance process.
+To price VIX futures and VIX options via Fourier-based methods such as the COS method, we require the characteristic function of the integrated variance process under Heston.
 
-Under the Heston model, the variance process follows a Cox–Ingersoll–Ross (CIR) process:
+Since \(\text{VIX}^2_t\) is affine in \(v_t\), pricing VIX derivatives reduces to computing the distribution of the integrated variance:
 
-$$dv_t = \kappa(\bar{v} - v_t)dt + \sigma\sqrt{v_t}dW_t^v$$
+$$ I_{t,T} = \int_t^T v_s\,ds $$
 
-The quantity of interest is:
+The characteristic function of this quantity is:
 
-$$I_{t,T} = \int_t^T v_s ds$$
+$$ \phi(u;\,t,T) = \mathbb{E}^{\mathbb{Q}}\left[e^{iu \int_t^T v_s\,ds}\,\Big|\,v_t\right] $$
 
-We define the characteristic function as:
+Under the Heston model, the variance process follows a CIR diffusion:
 
-$$\phi(u;t,T) = \mathbb{E}^{\mathbb{Q}}\left[e^{iu \int_t^T v_s ds}\middle| v_t\right]$$
+$$ dv_t = \kappa(\bar{v} - v_t)\,dt + \sigma\sqrt{v_t}\,dW_t^v $$
 
 ### Exponential-Affine Ansatz
 
-Because the CIR process is affine, the characteristic function admits the exponential-affine form:
+Because the CIR process belongs to the affine class of stochastic processes, the characteristic function admits the exponential-affine representation:
 
-$$\phi(u;t,T) =\exp\left(A(\tau,u) + B(\tau,u)v_t\right)$$
+$$ \phi(u;\,t,T) = \exp\!\Big(A(\tau,u) + B(\tau,u)\,v_t\Big) $$
 
-where $\tau = T-t$.
+where:
 
-Substituting the ansatz into the Feynman–Kac PDE yields the Riccati system:
+$$ \tau = T - t $$
 
-$$\frac{dB}{d\tau}=-\kappa B+\frac{1}{2}\sigma^2 B^2+iu$$
+with boundary conditions:
 
-with terminal condition:
+$$ A(0,u) = 0, \qquad B(0,u) = 0 $$
 
-$$B(0,u)=0$$
+### Feynman–Kac PDE and Riccati System
 
-and
+Using the Feynman–Kac theorem, the characteristic function satisfies the partial differential equation:
 
-$$\frac{dA}{d\tau}=\kappa\bar{v}B$$
+$$ \frac{\partial \phi}{\partial t} + \kappa(\bar{v} - v)\frac{\partial \phi}{\partial v} + \frac{1}{2}\sigma^2 v \frac{\partial^2 \phi}{\partial v^2} + iuv\,\phi = 0 $$
+
+Substituting the exponential-affine ansatz and collecting terms yields the Riccati system:
+
+$$ \frac{dB}{d\tau} = -\kappa B + \frac{1}{2}\sigma^2 B^2 + iu $$
 
 with:
 
-$$A(0,u)=0$$
+$$ B(0,u) = 0 $$
 
-### Financial Interpretation
+and:
 
-The affine structure of the CIR process is one of the main reasons why the Heston model remains computationally tractable. The closed-form characteristic function enables efficient pricing through Fourier inversion and the COS method.
+$$ \frac{dA}{d\tau} = \kappa\bar{v}\,B $$
+
+with:
+
+$$ A(0,u) = 0 $$
+
+### Closed-Form Solution
+
+Define:
+
+$$ \gamma = \sqrt{\kappa^2 - 2\sigma^2(iu)} $$
+
+The solution for \(B(\tau,u)\) is:
+
+$$ B(\tau,u) = \frac{2iu(1 - e^{-\gamma\tau})}{(\gamma + \kappa)(e^{\gamma\tau} - 1) + 2\gamma} $$
+
+Integrating the Riccati equation for \(A(\tau,u)\) gives:
+
+$$ A(\tau,u) = \frac{\kappa\bar{v}}{\sigma^2}\left[(\kappa - \gamma)\tau - 2\ln\left(1-\frac{\kappa-\gamma}{2\gamma}(1-e^{-\gamma\tau})\right)\right] $$
+
+Therefore, the complete characteristic function is:
+
+$$ \boxed{\phi(u;\,t,T) = \exp\!\Big(A(\tau,u) + B(\tau,u)\,v_t\Big)} $$
+
+### Verification
+
+At \(u = 0\):
+
+$$ \gamma = \kappa $$
+
+$$ A(\tau,0)=0 $$
+
+$$ B(\tau,0)=0 $$
+
+which implies:
+
+$$ \phi(0)=1 $$
+
+as required for a characteristic function.
+
+As the volatility-of-volatility parameter satisfies *σ → 0*,  the variance process becomes deterministic and the characteristic function converges to the transform of the deterministic integrated variance path.
+
+### Financial Interpretation and Connection to W4
+
+The affine structure of the CIR process is one of the main reasons why the Heston model remains computationally tractable.
+
+The closed-form characteristic function allows volatility derivatives to be priced efficiently using Fourier inversion techniques and the COS method without requiring expensive Monte Carlo simulation.
 
 This result is directly used in W4 for pricing VIX futures and VIX options.
 
@@ -128,33 +179,36 @@ This result is directly used in W4 for pricing VIX futures and VIX options.
 
 ### One-Factor Structure of Heston
 
-The Heston stochastic volatility model is a one-factor model because a single latent variance process $v_t$ drives both:
+The Heston model is a one-factor stochastic volatility model because a single latent variance process \(v_t\) drives both:
 
 - the SPX implied volatility surface,
 - and the VIX futures term structure.
 
-Under Heston:
+From the affine representation:
 
-$$\text{VIX}_t^2=\bar{v}+(v_t-\bar{v})\frac{1-e^{-\kappa\Delta}}{\kappa\Delta}$$
+$$ \text{VIX}_t^2 = \bar{v} + (v_t-\bar{v})\frac{1-e^{-\kappa\Delta}}{\kappa\Delta} $$
 
-Thus, the VIX is entirely determined by the same variance factor governing SPX option prices.
+the entire VIX structure is determined by the same variance factor that governs SPX option prices.
 
 ### Calibration Conflict
 
 In practice, market data shows that the parameter values required to fit SPX options are inconsistent with those required to fit VIX futures.
 
-In particular:
+This occurs because:
 
 - SPX options require strong short-term skew dynamics,
-- while VIX futures require a smoother and more persistent variance structure.
+- VIX futures require smoother long-term variance dynamics,
+- VIX options require realistic volatility-of-volatility behaviour.
 
-As a result, calibrating Heston to SPX options alone typically produces a poor fit to the observed VIX futures curve.
+As a result, calibrating Heston to SPX options alone generally produces a poor fit to the observed VIX futures curve.
 
 ### Economic Interpretation
 
 This issue is known as the joint calibration problem.
 
-The failure arises because one stochastic variance factor is insufficient to capture the full dynamics of the volatility market.
+The limitation arises because a single stochastic variance factor cannot fully capture the complexity of volatility markets.
+
+Recent research shows that one-factor stochastic volatility models struggle to reproduce the joint dynamics of SPX and VIX markets simultaneously.
 
 This motivates richer models such as:
 
@@ -164,14 +218,22 @@ This motivates richer models such as:
 
 ### Relation to This Project
 
-The joint calibration problem is studied explicitly in W6, where the model is calibrated jointly to SPX implied volatilities and VIX futures.
+The joint calibration problem is studied numerically in W6, where Heston is calibrated jointly to SPX implied volatilities and VIX futures.
 
-The expected result is that one-factor Heston fails to fit both markets simultaneously.
+The expected result is that one-factor Heston achieves a good fit for one market only at the expense of the other.
+
+This demonstrates the structural limitation of the model rather than a numerical calibration issue.
+
+---
 
 ## References
 
-- Demeterfi, K., Derman, E., Kamal, M., & Zou, J. (1999). *More Than You Ever Wanted to Know About Volatility Swaps.* Goldman Sachs.
+- Bergomi, L. (2005). *Smile Dynamics 2*. Risk Magazine.
 - Carr, P., & Wu, L. (2009). Variance Risk Premiums. *Review of Financial Studies*, 22(3).
-- Gatheral, J. (2006). *The Volatility Surface.* Wiley Finance.
+- Demeterfi, K., Derman, E., Kamal, M., & Zou, J. (1999). *More Than You Ever Wanted to Know About Volatility Swaps*. Goldman Sachs Quantitative Strategies Research Notes.
+- Duffie, D., Pan, J., & Singleton, K. (2000). Transform Analysis and Asset Pricing for Affine Jump-Diffusions. *Econometrica*, 68(6), 1343–1376.
+- Fang, F., & Oosterlee, C. W. (2008). A Novel Pricing Method for European Options Based on Fourier-Cosine Series Expansions. *SIAM Journal on Scientific Computing*, 31(2), 826–848.
+- Gatheral, J. (2006). *The Volatility Surface: A Practitioner's Guide*. Wiley Finance.
+- Heston, S. (1993). A Closed-Form Solution for Options with Stochastic Volatility. *Review of Financial Studies*, 6(2), 327–343.
 - Hirsa, A. (2024). *Computational Methods in Finance*. Chapman & Hall/CRC.
 - Shreve, S. (2004). *Stochastic Calculus for Finance II: Continuous-Time Models*. Springer.
