@@ -82,71 +82,39 @@ To price VIX futures and VIX options using Fourier-based pricing methods such as
 
 Under the Heston model, the variance process follows a Cox–Ingersoll–Ross (CIR) process:
 
-$$
-dv_t = \kappa(\bar{v} - v_t)dt + \sigma\sqrt{v_t}dW_t^v
-$$
+$$dv_t = \kappa(\bar{v} - v_t)dt + \sigma\sqrt{v_t}dW_t^v$$
 
 The quantity of interest is:
 
-$$
-I_{t,T} = \int_t^T v_s ds
-$$
+$$I_{t,T} = \int_t^T v_s ds$$
 
 We define the characteristic function as:
 
-$$
-\phi(u;t,T) = \mathbb{E}^{\mathbb{Q}}
-\left[
-e^{iu \int_t^T v_s ds}
-\middle| v_t
-\right]
-$$
+$$\phi(u;t,T) = \mathbb{E}^{\mathbb{Q}}\left[e^{iu \int_t^T v_s ds}\middle| v_t\right]$$
 
 ### Exponential-Affine Ansatz
 
 Because the CIR process is affine, the characteristic function admits the exponential-affine form:
 
-$$
-\phi(u;t,T) =
-\exp
-\left(
-A(\tau,u) + B(\tau,u)v_t
-\right)
-$$
+$$\phi(u;t,T) =\exp\left(A(\tau,u) + B(\tau,u)v_t\right)$$
 
 where $\tau = T-t$.
 
 Substituting the ansatz into the Feynman–Kac PDE yields the Riccati system:
 
-$$
-\frac{dB}{d\tau}
-=
--\kappa B
-+
-\frac{1}{2}\sigma^2 B^2
-+
-iu
-$$
+$$\frac{dB}{d\tau}=-\kappa B+\frac{1}{2}\sigma^2 B^2+iu$$
 
 with terminal condition:
 
-$$
-B(0,u)=0
-$$
+$$B(0,u)=0$$
 
 and
 
-$$
-\frac{dA}{d\tau}
-=
-\kappa\bar{v}B
-$$
+$$\frac{dA}{d\tau}=\kappa\bar{v}B$$
 
 with:
 
-$$
-A(0,u)=0
-$$
+$$A(0,u)=0$$
 
 ### Financial Interpretation
 
@@ -167,14 +135,7 @@ The Heston stochastic volatility model is a one-factor model because a single la
 
 Under Heston:
 
-$$
-\text{VIX}_t^2
-=
-\bar{v}
-+
-(v_t-\bar{v})
-\frac{1-e^{-\kappa\Delta}}{\kappa\Delta}
-$$
+$$\text{VIX}_t^2=\bar{v}+(v_t-\bar{v})\frac{1-e^{-\kappa\Delta}}{\kappa\Delta}$$
 
 Thus, the VIX is entirely determined by the same variance factor governing SPX option prices.
 
@@ -201,7 +162,7 @@ This motivates richer models such as:
 - forward variance models,
 - and rough volatility models.
 
-### Connection to the Present Project
+### Relation to This Project
 
 The joint calibration problem is studied explicitly in W6, where the model is calibrated jointly to SPX implied volatilities and VIX futures.
 
