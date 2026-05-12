@@ -14,20 +14,36 @@ Main files:
 
 ## Formulas used
 
-The variance process is:
+The variance process follows the Heston/CIR form:
 
-```text
-dv_t = kappa * (theta - v_t) dt + sigma_v * sqrt(v_t) dW_t
-```
+$$
+dv_t = \kappa(\theta - v_t)\,dt + \sigma_v \sqrt{v_t}\,dW_t
+$$
+
+where \(v_t\) is the instantaneous variance, \(\theta\) is the long-run variance level, \(\kappa\) is the mean-reversion speed, and \(\sigma_v\) is the volatility of variance.
 
 The analytical fair variance strike is:
 
-```text
-K_var = theta + (v0 - theta) * (1 - exp(-kappa * T)) / (kappa * T)
-```
+$$
+K_{\text{var}}
+=
+\theta
++
+(v_0 - \theta)
+\frac{1 - e^{-\kappa T}}{\kappa T}
+$$
 
-The VIX squared approximation is:
+This formula will be used as the first benchmark for the Monte Carlo result.
 
-```text
-VIX_t^2 = theta + (v_t - theta) * (1 - exp(-kappa * Delta)) / (kappa * Delta)
-```
+For the VIX-related Monte Carlo part, the project uses the affine relation:
+
+$$
+\text{VIX}_t^2
+=
+\theta
++
+(v_t - \theta)
+\frac{1 - e^{-\kappa \Delta}}{\kappa \Delta}
+$$
+
+So after simulating the variance process, the terminal variance can be converted into a VIX level and used for VIX call pricing.
