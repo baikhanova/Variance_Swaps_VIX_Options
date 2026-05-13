@@ -3,6 +3,7 @@ import pytest
 
 from src.models.cir import (
     CIRParams,
+    cir_char_fn,
     cir_terminal_moments,
     cir_terminal_variance_cf,
     cir_truncation_interval,
@@ -13,7 +14,9 @@ from src.models.cir import (
 from src.pricing.vix_cos import (
     COSSettings,
     compare_vix_call_cos_with_mc,
+    cos_density_recovery,
     price_vix_call_cos,
+    price_vix_futures_cos,
     price_vix_put_cos,
 )
 
@@ -244,6 +247,132 @@ def test_vix_put_cos_returns_expected_keys():
     }
 
     assert expected_keys.issubset(result.keys())
+
+
+def test_cir_char_fn_at_zero_is_one():
+    params = CIRParams()
+
+    value = cir_char_fn(u=0.0, tau=1.0, params=params)
+
+    assert np.isclose(value, 1.0 + 0.0j)
+
+
+def test_cir_char_fn_at_zero_tau_is_one():
+    params = CIRParams()
+
+    u_values = np.array([0.5, 1.0, 2.0])
+    values = cir_char_fn(u=u_values, tau=0.0, params=params)
+
+    assert values.shape == (3,)
+    assert np.allclose(values, np.ones(3, dtype=complex))
+
+
+def test_cir_char_fn_modulus_less_than_one_for_real_u():
+    params = CIRParams()
+
+    u_values = np.linspace(0.1, 5.0, 10)
+    values = cir_char_fn(u=u_values, tau=1.0, params=params)
+
+    assert np.all(np.abs(values) <= 1.0 + 1e-10)
+
+
+def test_cir_char_fn_vector_output_shape():
+    params = CIRParams()
+
+    u_values = np.array([0.0, 1.0, 2.0, 3.0])
+    values = cir_char_fn(u=u_values, tau=0.5, params=params)
+
+    assert values.shape == (4,)
+
+
+def test_cos_density_recovery_non_negative():
+    params = CIRParams()
+
+    lower, upper = cir_truncation_interval(params=params, maturity=1.0)
+    v_grid = np.linspace(lower + 1e-6, upper, 200)
+
+    density = cos_density_recovery(
+        v_grid=v_grid,
+        params=params,
+        maturity=1.0,
+        lower=lower,
+        upper=upper,
+        n_terms=64,
+    )
+
+    assert density.shape == v_grid.shape
+    assert np.all(density >= 0.0)
+
+
+def test_cos_density_recovery_integrates_to_approximately_one():
+    params = CIRParams()
+
+    lower, upper = cir_truncation_interval(params=params, maturity=1.0)
+    v_grid = np.linspace(lower, upper, 2000)
+
+    density = cos_density_recovery(
+        v_grid=v_grid,
+        params=params,
+        maturity=1.0,
+        lower=lower,
+        upper=upper,
+        n_terms=128,
+    )
+
+    if hasattr(np, "trapezoid"):
+        integral = float(np.trapezoid(density, v_grid))
+    else:
+        integral = float(np.trapz(density, v_grid))
+
+    assert np.isclose(integral, 1.0, atol=0.05)
+
+
+def test_vix_futures_price_is_positive():
+    params = CIRParams()
+
+    result = price_vix_futures_cos(
+        params=params,
+        maturity=30 / 365,
+        r=0.03,
+        settings=COSSettings(n_terms=64, coefficient_grid_size=1024),
+    )
+
+    assert result["vix_futures_price"] > 0
+    assert result["expected_vix"] > 0
+    assert result["upper_truncation"] > result["lower_truncation"]
+
+
+def test_vix_futures_price_returns_expected_keys():
+    params = CIRParams()
+
+    result = price_vix_futures_cos(
+        params=params,
+        maturity=30 / 365,
+        settings=COSSettings(n_terms=64, coefficient_grid_size=1024),
+    )
+
+    expected_keys = {
+        "vix_futures_price",
+        "expected_vix",
+        "lower_truncation",
+        "upper_truncation",
+        "n_terms",
+    }
+
+    assert expected_keys.issubset(result.keys())
+
+
+def test_vix_futures_price_near_atm_vix():
+    params = CIRParams(v0=0.04, kappa=2.0, theta=0.04, sigma_v=0.5)
+
+    result = price_vix_futures_cos(
+        params=params,
+        maturity=30 / 365,
+        r=0.0,
+        settings=COSSettings(n_terms=128, coefficient_grid_size=4096),
+    )
+
+    assert np.isclose(result["vix_futures_price"], 20.0, atol=1.5)
 
 
 def test_compare_vix_call_cos_with_mc():

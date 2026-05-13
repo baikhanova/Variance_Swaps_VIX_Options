@@ -141,6 +141,66 @@ def cir_truncation_interval(
     return lower, float(max(upper, 1e-8))
 
 
+def cir_char_fn(
+    u: np.ndarray | float,
+    tau: float,
+    params: CIRParams,
+) -> np.ndarray | complex:
+    """
+    Characteristic function of integrated CIR variance:
+
+        E[exp(iu * integral_0^tau v_s ds) | v_0]
+
+    Implements the exponential-affine form from W2 theory:
+
+        phi(u, tau) = exp(A(u, tau) + B(u, tau) * v0)
+
+    with the Riccati system solved in closed form. Let
+
+        gamma = sqrt(kappa^2 - 2 * sigma^2 * iu)
+        D(tau) = (kappa + gamma) + (gamma - kappa) * exp(-gamma * tau)
+
+    then:
+
+        B(u, tau) = 2iu * (1 - exp(-gamma * tau)) / D(tau)
+        A(u, tau) = kappa * theta / sigma^2
+                    * [(kappa - gamma) * tau - 2 * ln(D(tau) / (2 * gamma))]
+
+    Boundary conditions A(0) = B(0) = 0 are satisfied, so phi(0) = 1.
+    """
+    params.validate()
+
+    if tau < 0:
+        raise ValueError("tau must be non-negative.")
+
+    u_arr = np.asarray(u, dtype=np.complex128)
+    scalar = u_arr.ndim == 0
+    u_arr = np.atleast_1d(u_arr)
+
+    if tau == 0:
+        result = np.ones_like(u_arr)
+        return complex(result[0]) if scalar else result
+
+    kappa = params.kappa
+    theta = params.theta
+    sigma = params.sigma_v
+
+    gamma = np.sqrt(kappa**2 - 2.0 * sigma**2 * 1j * u_arr)
+
+    exp_neg = np.exp(-gamma * tau)
+    D = (kappa + gamma) + (gamma - kappa) * exp_neg
+
+    B = 2.0 * 1j * u_arr * (1.0 - exp_neg) / D
+
+    A = (kappa * theta / sigma**2) * (
+        (kappa - gamma) * tau - 2.0 * np.log(D / (2.0 * gamma))
+    )
+
+    result = np.exp(A + B * params.v0)
+
+    return complex(result[0]) if scalar else result
+
+
 def cir_terminal_variance_cf(
     u: np.ndarray | float,
     params: CIRParams,

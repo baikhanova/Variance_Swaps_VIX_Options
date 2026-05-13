@@ -9,6 +9,7 @@ from src.models.cir import (
     CIRParams,
     cir_terminal_variance_cf,
     cir_truncation_interval,
+    vix_affine_coefficients,
     vix_level_from_variance,
 )
 
@@ -52,7 +53,7 @@ def _cos_payoff_coefficients(
     n_terms: int,
 ) -> np.ndarray:
     """
-    Compute COS payoff coefficients by numerical integration.
+    Compute COS payoff coefficients by numerical integration (vectorised over k).
 
     Coefficient k is:
 
@@ -61,16 +62,17 @@ def _cos_payoff_coefficients(
     The first term is later multiplied by 0.5 in the COS summation.
     """
     width = upper - lower
-    coefficients = np.empty(n_terms)
 
-    for k in range(n_terms):
-        angle = k * np.pi * (variance_grid - lower) / width
-        integrand = payoff_values * np.cos(angle)
+    k = np.arange(n_terms, dtype=float)[:, np.newaxis]
+    v = variance_grid[np.newaxis, :]
 
-        coefficients[k] = 2.0 / width * _trapezoid_integral(
-            values=integrand,
-            grid=variance_grid,
-        )
+    angles = k * np.pi * (v - lower) / width
+    integrand = payoff_values[np.newaxis, :] * np.cos(angles)
+
+    if hasattr(np, "trapezoid"):
+        coefficients = 2.0 / width * np.trapezoid(integrand, variance_grid, axis=1)
+    else:
+        coefficients = 2.0 / width * np.trapz(integrand, variance_grid, axis=1)
 
     return coefficients
 
@@ -253,6 +255,113 @@ def price_vix_put_cos(
         "vix_put_cos_price": price,
         "expected_payoff": expected_payoff,
         "strike": strike,
+        "lower_truncation": lower,
+        "upper_truncation": upper,
+        "n_terms": settings.n_terms,
+    }
+
+
+def cos_density_recovery(
+    v_grid: np.ndarray,
+    params: CIRParams,
+    maturity: float,
+    lower: float,
+    upper: float,
+    n_terms: int,
+) -> np.ndarray:
+    """
+    Recover the PDF of terminal CIR variance v_T using the COS expansion.
+
+    The COS density approximation on [a, b] is:
+
+        f(v) ≈ (2/(b-a)) * sum_{k=0}^{N-1}' Re[phi_k] * cos(k*pi*(v-a)/(b-a))
+
+    where phi_k = phi(k*pi/(b-a)) * exp(-i*k*pi*a/(b-a)) and the prime
+    means the k=0 term is multiplied by 1/2.
+
+    The characteristic function phi is the one for terminal variance v_T
+    (noncentral chi-square distribution of the CIR process).
+    """
+    params.validate()
+
+    width = upper - lower
+    k = np.arange(n_terms)
+    u = k * np.pi / width
+
+    cf_values = cir_terminal_variance_cf(u=u, params=params, maturity=maturity)
+    phase = np.exp(-1j * u * lower)
+    phi_k = np.real(cf_values * phase)
+
+    v = np.asarray(v_grid)
+    k_col = k[:, np.newaxis]
+    v_row = v[np.newaxis, :]
+
+    cos_matrix = np.cos(k_col * np.pi * (v_row - lower) / width)
+    weighted = phi_k[:, np.newaxis] * cos_matrix
+    weighted[0] *= 0.5
+
+    density = (2.0 / width) * np.sum(weighted, axis=0)
+    return np.maximum(density, 0.0)
+
+
+def price_vix_futures_cos(
+    params: CIRParams,
+    maturity: float,
+    r: float = 0.03,
+    delta: float = 30 / 365,
+    settings: COSSettings | None = None,
+) -> dict[str, float]:
+    """
+    Price a VIX futures contract using the COS method.
+
+    The futures price is the discounted expected VIX at maturity:
+
+        F_VIX = exp(-r * T) * E[VIX_T]
+
+    where VIX_T = 100 * sqrt(A + B * v_T) is affine in terminal variance v_T.
+
+    The expectation is computed via COS using the characteristic function
+    of v_T under the CIR process.
+    """
+    params.validate()
+
+    if maturity <= 0:
+        raise ValueError("maturity must be positive.")
+
+    if settings is None:
+        settings = COSSettings()
+
+    settings.validate()
+
+    lower, upper = cir_truncation_interval(
+        params=params,
+        maturity=maturity,
+        std_width=settings.truncation_std_width,
+    )
+
+    variance_grid = np.linspace(lower, upper, settings.coefficient_grid_size)
+    terminal_vix = vix_level_from_variance(
+        variance=variance_grid,
+        params=params,
+        delta=delta,
+    )
+
+    expected_vix = _cos_expected_payoff(
+        params=params,
+        maturity=maturity,
+        payoff_values=terminal_vix,
+        variance_grid=variance_grid,
+        lower=lower,
+        upper=upper,
+        n_terms=settings.n_terms,
+    )
+
+    discount_factor = exp(-r * maturity)
+    futures_price = discount_factor * expected_vix
+
+    return {
+        "vix_futures_price": futures_price,
+        "expected_vix": expected_vix,
         "lower_truncation": lower,
         "upper_truncation": upper,
         "n_terms": settings.n_terms,
