@@ -96,7 +96,7 @@ directly as an infinite-dimensional object evolving under lognormal dynamics:
 
 $$d\xi_u^t = \omega \cdot \xi_u^t \cdot dW_t$$
 
-This framework decouples the instantaneous variance dynamics from the shape of the volatility surface, allowing the model to be calibrated to both SPX options and VIX futures simultaneously, subject to appropriate parameterisation. The forward variance model is the conceptual precursor to rough volatility models, which Participant 2 will discuss.
+This framework decouples the instantaneous variance dynamics from the shape of the volatility surface, allowing the model to be calibrated to both SPX options and VIX futures simultaneously, subject to appropriate parameterisation. The forward variance model is the conceptual precursor to rough volatility models discussed in Section 7 below.
 
 ### 4.4 Role in the Present Project
 
@@ -140,25 +140,11 @@ Gatheral (2006) serves as the primary analytical reference for W2, W4, and W7. W
 
 The four sources reviewed above do not merely coexist in the literature — they form a coherent logical chain. Demeterfi et al. (1999) establish that variance is a replicable, tradeable quantity and define its fair price in a model-free manner. Carr and Wu (2009) demonstrate empirically that the market price of variance systematically exceeds its realised value, establishing the variance risk premium as a robust and economically significant phenomenon. Bergomi (2005) identifies the structural reason why the dominant one-factor model — Heston — cannot simultaneously account for the SPX surface and the VIX term structure, thereby motivating the forward variance and multi-factor extensions that define the current research frontier. Gatheral (2006) provides the mathematical tools — the affinity result, the CIR characteristic function, and the smile analysis — that enable tractable analytical work within the Heston framework while also exposing its limitations.
 
-This logical progression — from replication, to empirical measurement, to model critique, to analytical tooling — mirrors the structure of the present project and provides the classical foundations upon which the contemporary literature reviewed by Participant 2 builds.
-
----
-
-## References
-
-Bergomi, L. (2005). Smile Dynamics 2. *Risk Magazine*.
-
-Carr, P., & Wu, L. (2009). Variance risk premiums. *Review of Financial Studies*, 22(3), 1311–1341.
-
-Demeterfi, K., Derman, E., Kamal, M., & Zou, J. (1999). *More than you ever wanted to know about volatility swaps*. Goldman Sachs Quantitative Strategies Research Notes.
-
-Gatheral, J. (2006). *The volatility surface: A practitioner's guide*. Wiley Finance.
+This logical progression — from replication, to empirical measurement, to model critique, to analytical tooling — mirrors the structure of the present project and provides the classical foundations upon which the contemporary literature reviewed in the second part builds.
 
 ---
 
 # W1: Literature Review — Contemporary Frontier Topics in Volatility Modelling
-
-## Participant 2 Contribution
 
 This section extends the classical literature review above with the contemporary research frontier relevant to variance swaps, VIX options, rough volatility, joint SPX--VIX calibration, and empirical realised-variance estimation. The classical sources explain why variance can be traded, how VIX is linked to option prices, and why one-factor stochastic volatility models are analytically convenient. The newer literature asks where those models break down and what methods are now used to repair the gap between theory and market data.
 
@@ -206,8 +192,6 @@ $$
 v_t = \xi_0(t)\exp\left(\eta \widetilde{W}_t^H - \frac{1}{2}\eta^2t^{2H}\right),
 $$
 
-where
-
 $$
 \widetilde{W}_t^H = \sqrt{2H}\int_0^t (t-s)^{H-1/2}\,dZ_s.
 $$
@@ -215,8 +199,7 @@ $$
 Here $Z$ is correlated with the Brownian motion driving the stock price, and $\xi_0(t)$ is the initial forward variance curve. The VIX is then linked to the conditional expectation of future integrated variance:
 
 $$
-\mathrm{VIX}_t^2 = \frac{1}{\Delta}\mathbb{E}_t\int_t^{t+\Delta} v_s\,ds,
-\qquad \Delta = 30/365.
+\mathrm{VIX}_t^2 = \frac{1}{\Delta}\mathbb{E}_t\int_t^{t+\Delta} v_s\,ds,\qquad \Delta = 30/365.
 $$
 
 The difficulty is that rough Bergomi is non-Markovian: $v_s$ depends on the past path of the fractional process, not just on a finite-dimensional state variable. This makes VIX option pricing, hedging, and calibration computationally demanding.
@@ -246,8 +229,7 @@ The classical Heston framework has a single latent variance factor $v_t$. Under 
 Guyon (2020) formalises this failure through an inversion of convex ordering in the VIX market. For a broad class of one-factor diffusion models,
 
 $$
-\frac{dS_t}{S_t} = \sqrt{f(X_t)}\,dW_t,
-\qquad
+\frac{dS_t}{S_t} = \sqrt{f(X_t)}\,dW_t,\qquad
 dX_t = \mu(X_t)\,dt + \sigma(X_t)\,dB_t,
 $$
 
@@ -335,8 +317,7 @@ $$
 where
 
 $$
-\gamma_h = \sum_{i=1}^{n-h} r_i r_{i+h},
-\qquad
+\gamma_h = \sum_{i=1}^{n-h} r_i r_{i+h},\qquad
 r_i = \log P_{t_i} - \log P_{t_{i-1}}.
 $$
 
@@ -371,17 +352,25 @@ For the project, the natural empirical workflow is:
 
 The classical literature establishes the project foundation: Demeterfi et al. explain why variance can be replicated from options; Carr and Wu turn the difference between implied and realised variance into an empirical risk premium; Bergomi shows why forward variance is the natural state variable for volatility derivatives; and Gatheral provides the analytical Heston and VIX machinery.
 
-The contemporary literature explains why these foundations are not enough. Rough volatility improves the description of short-maturity skew and volatility path regularity. Joint SPX--VIX calibration results show that one-factor models are too restrictive for VIX options. Realised kernels solve the empirical problem that naive high-frequency realised variance is biased by market microstructure noise. Together, these frontier topics define the Participant 2 contribution to the group project: connecting modern rough-volatility models and robust realised-variance estimation to the pricing and empirical analysis of variance swaps and VIX options.
+The contemporary literature explains why these foundations are not enough. Rough volatility improves the description of short-maturity skew and volatility path regularity. Joint SPX--VIX calibration results show that one-factor models are too restrictive for VIX options. Realised kernels solve the empirical problem that naive high-frequency realised variance is biased by market microstructure noise. Together, these frontier topics connect modern rough-volatility models and robust realised-variance estimation to the pricing and empirical analysis of variance swaps and VIX options.
 
 ---
 
-## Additional References for Participant 2
+## References
 
 Barndorff-Nielsen, O. E., Hansen, P. R., Lunde, A., & Shephard, N. (2008). Designing realised kernels to measure the ex-post variation of equity prices in the presence of noise. *Econometrica*, 76(6), 1481--1536.
 
 Barndorff-Nielsen, O. E., Hansen, P. R., Lunde, A., & Shephard, N. (2011). Multivariate realised kernels: consistent positive semi-definite estimators of the covariation of equity prices with noise and non-synchronous trading. *Journal of Econometrics*, 162(2), 149--169.
 
 Bayer, C., Friz, P., & Gatheral, J. (2016). Pricing under rough volatility. *Quantitative Finance*, 16(6), 887--904.
+
+Bergomi, L. (2005). Smile Dynamics 2. *Risk Magazine*.
+
+Carr, P., & Wu, L. (2009). Variance risk premiums. *Review of Financial Studies*, 22(3), 1311--1341.
+
+Demeterfi, K., Derman, E., Kamal, M., & Zou, J. (1999). *More than you ever wanted to know about volatility swaps*. Goldman Sachs Quantitative Strategies Research Notes.
+
+Gatheral, J. (2006). *The volatility surface: A practitioner's guide*. Wiley Finance.
 
 Gatheral, J., Jaisson, T., & Rosenbaum, M. (2018). Volatility is rough. *Quantitative Finance*, 18(6), 933--949.
 
