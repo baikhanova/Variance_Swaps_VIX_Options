@@ -191,7 +191,6 @@ def cross_validate_with_mc(
     if cos_settings is None:
         cos_settings = COSSettings(n_terms=256, truncation_std_width=8.0)
 
-    # ── Futures ──────────────────────────────────────────────────────────────
     cos_fut = price_vix_futures_cos(
         params=params, maturity=option_maturity, r=r, delta=delta, settings=cos_settings
     )
@@ -333,7 +332,6 @@ def speed_benchmark_mc(
         mc_mean_s    — mean time per call (seconds)
         n_repeats    — number of repetitions
     """
-    # Warm-up
     mc_price_fn()
 
     times = []
@@ -386,7 +384,6 @@ def model_vix_term_structure(
         maturity_years | maturity_months | model_futures_price
     """
     if maturities is None:
-        # Standard VIX futures maturities: monthly out to 8 months
         maturities = [m / 12 for m in range(1, 9)]
 
     if cos_settings is None:
@@ -479,7 +476,6 @@ def fetch_vix_futures_from_yahoo(
         return pd.DataFrame(columns=["ticker", "last_price", "maturity_approx_months"])
 
     if tickers is None:
-        # Yahoo Finance VIX front-month futures tickers
         tickers = ["^VIX1", "^VIX2", "^VIX3", "^VIX4", "^VIX5", "^VIX6"]
 
     rows = []
