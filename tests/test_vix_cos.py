@@ -20,6 +20,12 @@ from src.pricing.vix_cos import (
     price_vix_put_cos,
 )
 
+from src.pricing.w4_validation import (
+    convergence_over_n_terms,
+    convergence_over_truncation_width,
+    model_vix_term_structure,
+    density_recovery_check,
+)
 
 def test_cir_params_validation_accepts_base_case():
     params = CIRParams()
@@ -385,3 +391,67 @@ def test_compare_vix_call_cos_with_mc():
     assert result["mc_price"] == 1.8
     assert result["absolute_difference"] == pytest.approx(0.2)
     assert result["relative_difference"] == pytest.approx(0.2 / 1.8)
+
+
+def test_convergence_over_n_terms_returns_expected_columns():
+    params = CIRParams()
+    df = convergence_over_n_terms(
+        params=params,
+        option_maturity=30 / 365,
+        strike=20.0,
+        n_terms_grid=[8, 32, 128],
+        reference_n_terms=512,
+    )
+    assert {"n_terms", "cos_price", "abs_error", "rel_error"}.issubset(df.columns)
+    assert len(df) == 3
+    assert (df["abs_error"] >= 0).all()
+
+
+def test_convergence_error_decreases_with_n():
+    params = CIRParams()
+    df = convergence_over_n_terms(
+        params=params,
+        option_maturity=30 / 365,
+        strike=20.0,
+        n_terms_grid=[8, 64, 256],
+        reference_n_terms=1024,
+    )
+    errors = df["abs_error"].values
+    assert errors[0] >= errors[1]
+
+
+def test_convergence_over_truncation_width_returns_expected_columns():
+    params = CIRParams()
+    df = convergence_over_truncation_width(
+        params=params,
+        option_maturity=30 / 365,
+        strike=20.0,
+        std_widths=[4.0, 6.0, 8.0],
+        n_terms=64,
+        reference_std_width=10.0,
+    )
+    assert {"std_width", "lower", "upper", "cos_price", "abs_error"}.issubset(df.columns)
+    assert len(df) == 3
+    assert (df["upper"] > df["lower"]).all()
+
+
+def test_model_vix_term_structure_has_correct_shape():
+    params = CIRParams()
+    df = model_vix_term_structure(params)
+    assert len(df) == 8
+    assert (df["model_futures_price"] > 0).all()
+    assert (df["maturity_months"] > 0).all()
+
+
+def test_model_vix_term_structure_is_monotone_under_mean_reversion():
+    params = CIRParams(v0=0.09, kappa=2.0, theta=0.04, sigma_v=0.5)
+    df = model_vix_term_structure(params)
+    prices = df["model_futures_price"].values
+    assert prices[0] > prices[-1]
+
+
+def test_density_recovery_integrates_to_one():
+    params = CIRParams()
+    df = density_recovery_check(params, maturity=30 / 365, n_terms=128)
+    assert abs(df.attrs["integral"] - 1.0) < 0.05
+    assert (df["density_v"] >= 0).all()
