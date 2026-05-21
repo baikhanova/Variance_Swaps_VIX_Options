@@ -1,0 +1,37 @@
+\documentclass[12pt]{article}
+
+\usepackage[a4paper, margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{setspace}
+
+\onehalfspacing
+
+\title{Volatility as an Asset Class: Variance Swaps, VIX Options, and the Volatility Risk Premium}
+\author{Group 4}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This paper studies volatility as a tradable asset class through variance swaps, VIX options, and the volatility risk premium. The project combines theoretical derivations, Monte Carlo simulation, Fourier/COS pricing, and later empirical validation using market data.
+\end{abstract}
+
+\input{sections/01_introduction}
+\input{sections/02_literature_review}
+\input{sections/03_theory}
+\input{sections/04_monte_carlo}
+\input{sections/05_cos_pricing}
+\input{sections/06_data_calibration}
+\input{sections/07_results_discussion}
+\input{sections/08_conclusion}
+
+\bibliographystyle{apalike}
+\bibliography{references}
+
+\end{document}
