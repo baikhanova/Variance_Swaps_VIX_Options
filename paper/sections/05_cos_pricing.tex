@@ -1,0 +1,209 @@
+\section{CIR-Based COS Pricing of VIX Derivatives}
+\label{sec:cos_pricing}
+
+This section develops the Fourier-cosine pricing framework used for VIX derivatives. The purpose of this part is to provide a deterministic semi-analytical benchmark for the Monte Carlo prices obtained in Section~\ref{sec:monte_carlo}. Transform methods are widely used in computational finance because characteristic functions are often available even when the transition density is not available in closed form \citep{hirsa2024}. The COS method is particularly suitable in this setting because it approximates the pricing integral through a finite cosine expansion and can converge rapidly when the truncation interval is chosen appropriately \citep{junike2022cos,junike2024cos}.
+
+\subsection{Terminal CIR Distribution}
+
+Under the Heston model, the variance process follows a Cox--Ingersoll--Ross process:
+\begin{equation}
+dv_t=\kappa(\theta-v_t)dt+\sigma_v\sqrt{v_t}\,dW_t^v.
+\end{equation}
+For a fixed maturity $T$, the terminal variance has a scaled non-central chi-square distribution:
+\begin{equation}
+v_T \sim c_T\chi^2_d(\lambda_T),
+\end{equation}
+where
+\begin{align}
+c_T &= \frac{\sigma_v^2(1-e^{-\kappa T})}{4\kappa},\\
+d &= \frac{4\kappa\theta}{\sigma_v^2},\\
+\lambda_T
+&=
+\frac{4\kappa e^{-\kappa T}v_0}
+{\sigma_v^2(1-e^{-\kappa T})}.
+\end{align}
+
+The characteristic function of $v_T$ is therefore
+\begin{equation}
+\boxed{
+\phi_{v_T}(u)
+=
+(1-2iu c_T)^{-d/2}
+\exp\left(
+\frac{iu c_T\lambda_T}{1-2iu c_T}
+\right).
+}
+\end{equation}
+This is the characteristic function used in the COS method. It is important that this terminal variance characteristic function is not confused with the transform of integrated variance. The terminal variance $v_T$ is used for VIX derivative pricing, whereas integrated variance is used for variance swap valuation.
+
+\subsection{State Variable and Payoff}
+
+The pricing state variable in the COS implementation is the terminal variance:
+\begin{equation}
+X=v_T.
+\end{equation}
+The Heston-implied VIX proxy is then obtained from
+\begin{equation}
+\widetilde{\mathrm{VIX}}_T
+=
+100\sqrt{A_\Delta+B_\Delta v_T},
+\end{equation}
+where
+\begin{align}
+B_\Delta &= \frac{1-e^{-\kappa\Delta}}{\kappa\Delta},\\
+A_\Delta &= \theta(1-B_\Delta).
+\end{align}
+
+For a VIX call with strike $K$, the payoff as a function of terminal variance is
+\begin{equation}
+g_{\mathrm{call}}(v)
+=
+\left(
+100\sqrt{A_\Delta+B_\Delta v}
+-
+K
+\right)^+.
+\end{equation}
+For a VIX put, the payoff is
+\begin{equation}
+g_{\mathrm{put}}(v)
+=
+\left(
+K
+-
+100\sqrt{A_\Delta+B_\Delta v}
+\right)^+.
+\end{equation}
+
+\subsection{COS Approximation}
+
+Let $X$ be a random variable with characteristic function $\phi_X(u)$ and let $[a,b]$ be a finite truncation interval. The density of $X$ is approximated by the Fourier-cosine expansion
+\begin{equation}
+f_X(x)
+\approx
+\sum_{k=0}^{N-1}{}'
+\frac{2}{b-a}
+\operatorname{Re}
+\left[
+\phi_X\left(\frac{k\pi}{b-a}\right)
+e^{-i k\pi a/(b-a)}
+\right]
+\cos\left(
+\frac{k\pi(x-a)}{b-a}
+\right),
+\end{equation}
+where the prime indicates that the first term is multiplied by one half.
+
+For a payoff $g(X)$, the discounted price is approximated by
+\begin{equation}
+V_0
+\approx
+e^{-rT}
+\sum_{k=0}^{N-1}{}'
+\operatorname{Re}
+\left[
+\phi_X\left(\frac{k\pi}{b-a}\right)
+e^{-i k\pi a/(b-a)}
+\right]
+G_k,
+\end{equation}
+where the payoff coefficient is
+\begin{equation}
+G_k
+=
+\frac{2}{b-a}
+\int_a^b
+g(x)
+\cos\left(
+\frac{k\pi(x-a)}{b-a}
+\right)dx.
+\end{equation}
+
+In this project, $X=v_T$ and $\phi_X=\phi_{v_T}$. The payoff coefficients are computed numerically because the VIX payoff is nonlinear in terminal variance.
+
+The numerical accuracy of the COS method depends on two related choices: the number of cosine terms $N$ and the truncation interval $[a,b]$. Recent studies show that the truncation range cannot be treated as a purely mechanical parameter, because an interval that is too narrow may exclude relevant probability mass, while an excessively wide interval may slow convergence \citep{junike2022cos}. The number of terms must also be selected with respect to the payoff shape and the distributional properties of the underlying state variable \citep{junike2024cos}.
+
+\subsection{COS Price of a VIX Call}
+
+The COS approximation of a VIX call price is
+\begin{equation}
+C^{COS}_0(K,T)
+=
+e^{-rT}
+\sum_{k=0}^{N-1}{}'
+\operatorname{Re}
+\left[
+\phi_{v_T}\left(\frac{k\pi}{b-a}\right)
+e^{-i k\pi a/(b-a)}
+\right]
+G_k^{call},
+\end{equation}
+where
+\begin{equation}
+G_k^{call}
+=
+\frac{2}{b-a}
+\int_a^b
+\left(
+100\sqrt{A_\Delta+B_\Delta v}
+-
+K
+\right)^+
+\cos\left(
+\frac{k\pi(v-a)}{b-a}
+\right)dv.
+\end{equation}
+
+Similarly, the put price is
+\begin{equation}
+P^{COS}_0(K,T)
+=
+e^{-rT}
+\sum_{k=0}^{N-1}{}'
+\operatorname{Re}
+\left[
+\phi_{v_T}\left(\frac{k\pi}{b-a}\right)
+e^{-i k\pi a/(b-a)}
+\right]
+G_k^{put},
+\end{equation}
+where
+\begin{equation}
+G_k^{put}
+=
+\frac{2}{b-a}
+\int_a^b
+\left(
+K
+-
+100\sqrt{A_\Delta+B_\Delta v}
+\right)^+
+\cos\left(
+\frac{k\pi(v-a)}{b-a}
+\right)dv.
+\end{equation}
+
+\subsection{Truncation Interval}
+
+The COS method requires a finite interval $[a,b]$. Since the CIR variance process is non-negative, the lower bound is set to
+\begin{equation}
+a=0.
+\end{equation}
+The upper bound is chosen to include most of the probability mass of $v_T$. A practical choice is
+\begin{equation}
+b
+=
+\mathbb{E}^{\mathbb{Q}}[v_T]
++
+L\sqrt{\operatorname{Var}^{\mathbb{Q}}(v_T)},
+\end{equation}
+where $L$ is a truncation-width parameter. The mean of terminal variance is
+\begin{equation}
+\mathbb{E}^{\mathbb{Q}}[v_T]
+=
+\theta+(v_0-\theta)e^{-\kappa T}.
+\end{equation}
+
+The truncation interval is a critical numerical input. Increasing the number of COS terms $N$ improves the cosine approximation only if the interval already captures the relevant part of the distribution. Therefore, convergence is checked with respect to both $N$ and the interval width. This follows the recent COS-method literature, where the truncation range and the number of expansion terms are treated as central sources of numerical accuracy rather than secondary implementation details \citep{junike2022cos,junike2024cos}.
+
+\subsection{Density Recovery}
