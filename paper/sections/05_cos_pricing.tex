@@ -207,3 +207,47 @@ where $L$ is a truncation-width parameter. The mean of terminal variance is
 The truncation interval is a critical numerical input. Increasing the number of COS terms $N$ improves the cosine approximation only if the interval already captures the relevant part of the distribution. Therefore, convergence is checked with respect to both $N$ and the interval width. This follows the recent COS-method literature, where the truncation range and the number of expansion terms are treated as central sources of numerical accuracy rather than secondary implementation details \citep{junike2022cos,junike2024cos}.
 
 \subsection{Density Recovery}
+
+The same COS expansion can be used to recover the terminal variance density:
+\begin{equation}
+\widehat{f}_{v_T}(v)
+=
+\sum_{k=0}^{N-1}{}'
+\frac{2}{b-a}
+\operatorname{Re}
+\left[
+\phi_{v_T}\left(\frac{k\pi}{b-a}\right)
+e^{-i k\pi a/(b-a)}
+\right]
+\cos\left(
+\frac{k\pi(v-a)}{b-a}
+\right).
+\end{equation}
+The recovered density is validated by checking that
+\begin{equation}
+\int_a^b \widehat{f}_{v_T}(v)\,dv \approx 1
+\end{equation}
+and that the recovered first moment is close to
+\begin{equation}
+\mathbb{E}^{\mathbb{Q}}[v_T]
+=
+\theta+(v_0-\theta)e^{-\kappa T}.
+\end{equation}
+These checks ensure that the characteristic function, the truncation interval, and the cosine expansion are implemented consistently.
+
+\subsection{Comparison with Monte Carlo}
+
+The COS method produces a deterministic semi-analytical price, while Monte Carlo produces a simulation-based estimate with sampling uncertainty. The two methods are compared using the absolute error
+\begin{equation}
+\mathrm{AbsError}
+=
+|C^{COS}_0-C^{MC}_0|
+\end{equation}
+and the relative error
+\begin{equation}
+\mathrm{RelError}
+=
+\frac{|C^{COS}_0-C^{MC}_0|}{C^{MC}_0}.
+\end{equation}
+
+A small difference between the COS and Monte Carlo prices provides numerical cross-validation. If the difference is larger than expected, the possible sources are Monte Carlo sampling error, time-discretisation bias, an insufficient COS truncation interval, or an insufficient number of cosine terms. For this reason, the validation procedure checks both Monte Carlo convergence and COS convergence before interpreting the final pricing difference.
