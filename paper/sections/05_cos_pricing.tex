@@ -81,7 +81,7 @@ Let $X$ be a random variable with characteristic function $\phi_X(u)$ and let $[
 \begin{equation}
 f_X(x)
 \approx
-\sum_{k=0}^{N-1}{}'
+\sideset{}{'}\sum_{k=0}^{N-1}
 \frac{2}{b-a}
 \operatorname{Re}
 \left[
@@ -99,7 +99,7 @@ For a payoff $g(X)$, the discounted price is approximated by
 V_0
 \approx
 e^{-rT}
-\sum_{k=0}^{N-1}{}'
+\sideset{}{'}\sum_{k=0}^{N-1}
 \operatorname{Re}
 \left[
 \phi_X\left(\frac{k\pi}{b-a}\right)
@@ -130,7 +130,7 @@ The COS approximation of a VIX call price is
 C^{COS}_0(K,T)
 =
 e^{-rT}
-\sum_{k=0}^{N-1}{}'
+\sideset{}{'}\sum_{k=0}^{N-1}
 \operatorname{Re}
 \left[
 \phi_{v_T}\left(\frac{k\pi}{b-a}\right)
@@ -159,7 +159,7 @@ Similarly, the put price is
 P^{COS}_0(K,T)
 =
 e^{-rT}
-\sum_{k=0}^{N-1}{}'
+\sideset{}{'}\sum_{k=0}^{N-1}
 \operatorname{Re}
 \left[
 \phi_{v_T}\left(\frac{k\pi}{b-a}\right)
@@ -212,7 +212,7 @@ The same COS expansion can be used to recover the terminal variance density:
 \begin{equation}
 \widehat{f}_{v_T}(v)
 =
-\sum_{k=0}^{N-1}{}'
+\sideset{}{'}\sum_{k=0}^{N-1}
 \frac{2}{b-a}
 \operatorname{Re}
 \left[
