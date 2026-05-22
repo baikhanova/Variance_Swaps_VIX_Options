@@ -35,7 +35,7 @@
 \title{Volatility as an Asset Class}
 \subtitle{Variance Swaps, VIX Options, and the Volatility Risk Premium}
 \author{Group 4}
-\date{Covered: W1 Literature, W2 Theory, W3 Monte Carlo, W4 Fourier Engineer\\[4pt]
+\date{Covered: W1 Literature, W2 Theory, W3 Monte Carlo, W4 Fourier/COS Engine\\[4pt]
 \textit{Stochastic Processes --- Group Research Projects}}
 
 % ════════════════════════════════════════════════════
@@ -172,9 +172,18 @@ Boundary check: $\varphi(0;\tau)=1$ \;\checkmark\qquad $|\varphi(u;\tau)|\le 1$ 
     Full-truncation Euler scheme; correlated BM for $(S_t, v_t)$;
     variance floored at 0 to avoid negative values.
 
-  \item[Realised variance]
-    $\mathrm{RV} = \sum ({\ln S_{t_i}/S_{t_{i-1}}})^2 / T$ \;(annualised);
-    compared to analytical $K_{\mathrm{var}}$ --- error ${<}\,1\%$ at 10\,000 paths.
+    \item[Realised variance]
+    $\displaystyle
+    \mathrm{RV}_{0,T}
+    =
+    \frac{1}{T}
+    \sum_{i=1}^{m}
+    \left(
+    \ln\frac{S_{t_i}}{S_{t_{i-1}}}
+    \right)^2
+    $
+    \;(annualised);
+    compared to analytical $K_{\mathrm{var}}$.
 
   \item[VIX call by MC]
     Simulate $\mathrm{VIX}_T = 100\sqrt{A+B\cdot v_T}$ at option maturity;
@@ -184,14 +193,14 @@ Boundary check: $\varphi(0;\tau)=1$ \;\checkmark\qquad $|\varphi(u;\tau)|\le 1$ 
     Path counts $500 \to 50\,000$;
     MC error $\sim 1/\sqrt{N}$ as expected; CI width plotted.
 
-  \item[VRP simulation]
-    $\mathrm{VRP}_{\mathrm{sim}} = v_0 - \mathrm{RV}_{0,T}$ per path; distribution is right-skewed
-    with positive mean $\approx 2$--$3$ vol pts confirming the VRP.
+  \item[Preliminary VRP proxy]
+    Simulated realised variance can later be compared with implied variance once market data is added;
+    full VRP backtesting is left for the empirical stage.
 \end{description}
 \end{frame}
 
 % ── Slide 7: COS Engine ──
-\begin{frame}{W4 -- Fourier Engineer: COS Pricing Engine \;(\texttt{vix\_cos.py})}
+\begin{frame}{W4 -- Fourier/COS Pricing Engine \;(\texttt{vix\_cos.py})}
 
 \textbf{Core idea:} express the expected payoff as a Fourier-cosine series using the known characteristic function of terminal variance.
 
@@ -199,14 +208,28 @@ Boundary check: $\varphi(0;\tau)=1$ \;\checkmark\qquad $|\varphi(u;\tau)|\le 1$ 
 \column{0.35\textwidth}
 \textbf{COS density recovery}
 \[
-  f(v) \approx \frac{2}{b-a}\sideset{}{'}\sum_k \mathrm{Re}[\varphi_k]\cos\!\Bigl(\frac{k\pi(v-a)}{b-a}\Bigr)
+  f(v)
+  \approx
+  \sideset{}{'}\sum_{k=0}^{N-1}
+  \frac{2}{b-a}
+  \mathrm{Re}\!\left[
+  \varphi_{v_T}\!\left(\frac{k\pi}{b-a}\right)
+  e^{-ik\pi a/(b-a)}
+  \right]
+  \cos\!\left(\frac{k\pi(v-a)}{b-a}\right)
 \]
 Density integrates to 1 within 0.5\%.
 
 \column{0.35\textwidth}
 \textbf{Expected payoff via COS}
 \[
-  \mathbb{E}[g(v_T)] \approx \sideset{}{'}\sum_k \mathrm{Re}\!\bigl[\varphi_k\, e^{-ik\pi a/(b-a)}\bigr] V_k
+  \mathbb{E}[g(v_T)]
+  \approx
+  \sideset{}{'}\sum_{k=0}^{N-1}
+  \mathrm{Re}\!\left[
+  \varphi_{v_T}\!\left(\frac{k\pi}{b-a}\right)
+  e^{-ik\pi a/(b-a)}
+  \right]V_k
 \]
 $V_k$ = payoff cosine coefficient.\\
 Vectorised: $O(N\!\cdot\!M)$.
@@ -232,14 +255,20 @@ Vectorised: $O(N\!\cdot\!M)$.
 
   \item \textbf{Compute characteristic function:}
     \[
-      \varphi_k = \mathrm{Re}\!\Bigl[\varphi\!\bigl(k\pi/(b\!-\!a)\bigr)\cdot e^{-ik\pi a/(b-a)}\Bigr],
-      \quad k=0,\dots,N\!-\!1.
+  u_k=\frac{k\pi}{b-a},
+  \qquad
+  \varphi_k
+  =
+  \mathrm{Re}\!\left[
+  \varphi_{v_T}(u_k)e^{-iu_ka}
+  \right],
+  \quad k=0,\dots,N-1.
     \]
 
   \item \textbf{Compute payoff coefficients $V_k$:}
     \[
       V_k = \frac{2}{b-a}\int_a^b g(v)\cos\!\Bigl(\frac{k\pi(v-a)}{b-a}\Bigr)dv,
-      \quad g(v)=\max\!\bigl(100\sqrt{A+Bv}-K,\,0\bigr).
+      \quad g(v)=\left(100\sqrt{A+Bv}-K\right)^+.
     \]
 
   \item \textbf{COS summation:}
@@ -271,13 +300,13 @@ Parameters: $v_0\!=\!0.04$, $\kappa\!=\!2$, $\theta\!=\!0.04$, $\sigma_v\!=\!0.5
 \end{tabular}
 \end{center}
 
-Convergence plateau at $N\ge 64$ terms --- COS stable; MC difference within MC standard error.
+COS and Monte Carlo prices are close under the same parameter set; the relative difference is approximately $1.21\%$.
 
 \medskip
 \textbf{Numerical verification:}
 \begin{itemize}
   \item Density recovery: $\int f(v)\,dv \approx 1.000$ (atol 0.05) --- verified by test suite.
-  \item All 27 unit tests pass: CF boundary conditions, truncation interval, call/put prices, VIX futures.
+  \item Unit tests check CF boundary conditions, truncation interval, call/put prices, VIX futures, and density recovery.
 \end{itemize}
 \end{frame}
 
@@ -289,8 +318,8 @@ Convergence plateau at $N\ge 64$ terms --- COS stable; MC difference within MC s
 \textbf{Convergence in $N$ (number of terms)}
 \begin{itemize}
   \item Price error vs.\ $N$ for $N \in \{8, 16, 32, 64, 128, 256, 512\}$
-  \item Exponential convergence --- error drops $\sim$10$\times$ per doubling of $N$
-  \item $N=64$ sufficient for 4-digit accuracy; $N=128$ used as default
+  \item COS price is checked for stability as $N$ increases
+  \item $N=128$ is used as the reported benchmark setting
 \end{itemize}
 
 \textbf{COS density recovery}
@@ -304,7 +333,7 @@ Convergence plateau at $N\ge 64$ terms --- COS stable; MC difference within MC s
 \textbf{Convergence in truncation width}
 \begin{itemize}
   \item Price vs.\ $\mathrm{std\_width} \in \{4, 6, 8, 10, 12\}$
-  \item Width $8\sigma$ captures ${>}\,99.99\%$ of CIR mass --- standard choice
+  \item Width $8\sigma$ is used as a practical truncation rule
   \item Wider intervals add negligible mass but increase numerical cost
 \end{itemize}
 \end{columns}
@@ -313,7 +342,7 @@ Convergence plateau at $N\ge 64$ terms --- COS stable; MC difference within MC s
 % ── Slide 11: VIX Term Structure ──
 \begin{frame}{W4 -- VIX Futures Term Structure $F(0,T)$ vs.\ $T$}
 
-Model VIX futures via COS:\; $F(0,T) = e^{-rT}\cdot\mathbb{E}\!\bigl[100\sqrt{A+B\cdot v_T}\bigr]$.
+Model VIX futures via COS:\; $F(0,T)=\mathbb{E}^{\mathbb{Q}}\!\bigl[100\sqrt{A+B\cdot v_T}\bigr]$.
 
 \medskip
 \begin{center}\small
@@ -322,8 +351,8 @@ Model VIX futures via COS:\; $F(0,T) = e^{-rT}\cdot\mathbb{E}\!\bigl[100\sqrt{A+
   Maturity & 1M & 2M & 3M & 4M & 5M & 6M & 9M & 12M \\
   \midrule
   $v_0\!=\!\theta\!=\!0.04$ (flat) & 19.8 & 19.9 & 19.9 & 19.9 & 20.0 & 20.0 & 20.0 & 20.0 \\
-  $v_0\!=\!0.09>\theta$ (contango$\downarrow$) & 30.7 & 27.2 & 25.2 & 23.9 & 23.0 & 22.3 & 21.4 & 20.9 \\
-  $v_0\!=\!0.01<\theta$ (backwd.$\uparrow$) & 15.8 & 16.9 & 17.7 & 18.2 & 18.5 & 18.8 & 19.3 & 19.6 \\
+  $v_0\!=\!0.09>\theta$ (backwardation$\downarrow$) & 30.7 & 27.2 & 25.2 & 23.9 & 23.0 & 22.3 & 21.4 & 20.9 \\
+  $v_0\!=\!0.01<\theta$ (contango$\uparrow$) & 15.8 & 16.9 & 17.7 & 18.2 & 18.5 & 18.8 & 19.3 & 19.6 \\
   \bottomrule
 \end{tabular}
 \end{center}
@@ -331,8 +360,8 @@ Model VIX futures via COS:\; $F(0,T) = e^{-rT}\cdot\mathbb{E}\!\bigl[100\sqrt{A+
 \medskip
 \textbf{Economic interpretation:}
 \begin{itemize}
-  \item When $v_0 > \theta$: futures curve slopes downward (contango) --- variance mean-reverts lower.
-  \item When $v_0 < \theta$: curve slopes upward (backwardation) --- variance expected to rise.
+  \item When $v_0 > \theta$: futures curve slopes downward (backwardation) --- variance mean-reverts lower.
+  \item When $v_0 < \theta$: curve slopes upward (contango) --- variance is expected to rise.
   \item \texttt{model\_vix\_term\_structure} computes 8 maturities using \texttt{COSSettings(N=128)}.
 \end{itemize}
 \end{frame}
@@ -463,7 +492,7 @@ Both methods price the same VIX call. COS uses the analytical CF; MC uses simula
 \begin{itemize}\small
   \item Characteristic function + Fourier series
   \item $O(N\cdot M)$ vectorised --- runs in milliseconds
-  \item $N=64$ gives 4-decimal accuracy
+  \item Accuracy depends on $N$ and the truncation interval
   \item No MC variance --- deterministic
   \item Truncation error well-controlled by \texttt{std\_width}
   \item Used for: call, put, futures, density, term structure
@@ -476,17 +505,17 @@ Both methods price the same VIX call. COS uses the analytical CF; MC uses simula
   \item Simulate 10\,000+ Heston/CIR paths
   \item $O(\text{paths}\cdot\text{steps})$ --- slower but intuitive
   \item Confidence interval explicit via CLT
-  \item MC standard error $\approx \sigma/\sqrt{N} \approx 0.10$ for $N\!=\!10$K
-  \item Validates COS within MC noise band
-  \item Used for: VRP distribution, P\&L, model check
+  \item MC standard error decreases at rate $O(N^{-1/2})$
+  \item Provides an independent benchmark for COS pricing
+  \item Used for: realised variance, VIX call pricing, and model checks
 \end{itemize}
 \end{block}
 \end{columns}
 
 \vspace{6pt}
 \centering
-COS price $\approx$ MC price within MC standard error \;(abs.\ diff ${<}\,0.10$ VIX pts).\\[2pt]
-Both methods converge to the same expectation --- cross-validation confirms engine correctness.
+COS and MC prices are close under the same parameter set.\\[2pt]
+The two methods provide cross-validation for the pricing engine.
 \end{frame}
 
 % ── Slide 15: Key Formulas ──
@@ -497,11 +526,11 @@ Both methods converge to the same expectation --- cross-validation confirms engi
   \toprule
   CIR process & $dv_t = \kappa(\theta - v_t)\,dt + \sigma_v\sqrt{v_t}\,dW_t$ \\
   Variance swap strike & $K_{\mathrm{var}} = \theta + \dfrac{(v_0-\theta)(1-e^{-\kappa T})}{\kappa T}$ \\
-  VIX affine & $\mathrm{VIX}_t^2 = A + B\cdot v_t$,\;\; $B=\dfrac{1-e^{-\kappa\Delta}}{\kappa\Delta}$,\;\; $A=\theta(1-B)$ \\
-  CIR terminal CF & $\varphi(u;T) = (1-2ic\sigma^2 u)^{-d/2}\exp\!\bigl(\lambda\cdot icu/(1-2icu\cdot c)\bigr)$ \\
+  VIX affine & $\widetilde{\mathrm{VIX}}_t = 100\sqrt{A+Bv_t}$,\;\; $B=\dfrac{1-e^{-\kappa\Delta}}{\kappa\Delta}$,\;\; $A=\theta(1-B)$ \\
+  CIR terminal CF & $\varphi_{v_T}(u)=(1-2iu c_T)^{-d/2}\exp\!\left(\dfrac{iu c_T\lambda_T}{1-2iu c_T}\right)$ \\
   CIR integrated CF & $\tilde\varphi(u;\tau) = \exp\!\bigl(A(\tau)+B(\tau)\cdot v_0\bigr)$,\;\; $B = \dfrac{2iu(1-e^{-\gamma\tau})}{D(\tau)}$ \\
   COS option price & $C = e^{-rT}\displaystyle\sideset{}{'}\sum_{k=0}^{N-1}\mathrm{Re}\!\bigl[\varphi_k\, e^{-ik\pi a/(b-a)}\bigr]\cdot V_k$ \\
-  VIX futures & $F(0,T) = e^{-rT}\cdot\mathbb{E}^{\mathbb{Q}}\!\bigl[100\sqrt{A+B\cdot v_T}\bigr]$ \\
+  VIX futures & $F(0,T)=\mathbb{E}^{\mathbb{Q}}\!\bigl[100\sqrt{A+B\cdot v_T}\bigr]$ \\
   VRP definition & $\mathrm{VRP}_t = \mathrm{IV}_t^2 - \mathbb{E}_t^{\mathbb{P}}[\mathrm{RV}_{t,t+\Delta}]$ \;(positive $\Rightarrow$ overpay for vol) \\
   \bottomrule
 \end{tabular}
@@ -525,7 +554,7 @@ Both methods converge to the same expectation --- cross-validation confirms engi
 \column{0.48\textwidth}
 \checkmark\; W3 --- VIX call option by Monte Carlo\\[2pt]
 \checkmark\; W3 --- MC convergence study (\texttt{run\_convergence\_study})\\[2pt]
-\checkmark\; W3 --- VRP simulation: distribution and positive mean\\[2pt]
+\checkmark\; W3 --- Preliminary variance-risk proxy prepared for later VRP extension\\[2pt]
 \checkmark\; W4 --- COS density recovery for terminal CIR variance\\[2pt]
 \checkmark\; W4 --- \texttt{price\_vix\_call\_cos} + \texttt{price\_vix\_put\_cos}\\[2pt]
 \checkmark\; W4 --- \texttt{price\_vix\_futures\_cos} (VIX term structure $F(0,T)$)\\[2pt]
@@ -562,10 +591,10 @@ Both methods converge to the same expectation --- cross-validation confirms engi
 \begin{minipage}{0.85\textwidth}
   \checkmark\; W1: Literature reviewed with research frontier (rough vol, joint calibration)\\[4pt]
   \checkmark\; W2: Full derivations --- $K_{\mathrm{var}}$, $\mathrm{VIX}^2$ affine formula, CIR CF via Riccati ODE\\[4pt]
-  \checkmark\; W3: Monte Carlo engine with variance swap, VIX call, convergence study, VRP\\[4pt]
+  \checkmark\; W3: Monte Carlo engine with Heston paths, realised variance, variance swap benchmark, and VIX call pricing\\[4pt]
   \checkmark\; W4: COS pricing engine for VIX call, put, and futures --- validated, 27 tests passing\\[4pt]
   \checkmark\; VIX term structure reproduces correct contango / backwardation under CIR dynamics\\[4pt]
-  \checkmark\; COS exponential convergence confirmed: $N=64$ terms sufficient for 4-digit accuracy\\[12pt]
+  \checkmark\; COS convergence checked with respect to the number of terms and truncation width\\[12pt]
   \Large\textbf{Ready for W5--W6: real data calibration, hedging, and alpha backtest}
 \end{minipage}
 \end{center}
