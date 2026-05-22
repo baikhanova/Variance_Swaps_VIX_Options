@@ -81,7 +81,7 @@ where $A = \bar{v}\left(1 - \frac{1-e^{-\kappa\Delta}}{\kappa\Delta}\right)$ and
 
 To price VIX futures and VIX options via Fourier-based methods such as the COS method, we require the characteristic function of the integrated variance process under Heston.
 
-Since \(\text{VIX}^2_t\) is affine in \(v_t\), pricing VIX derivatives reduces to computing the distribution of the integrated variance:
+Since $VIX_t^2$ is affine in $v_t$, pricing VIX derivatives reduces to computing the distribution of the integrated variance:
 
 $$ I_{t,T} = \int_t^T v_s\,ds $$
 
@@ -135,11 +135,11 @@ Define:
 
 $$ \gamma = \sqrt{\kappa^2 - 2\sigma^2(iu)} $$
 
-The solution for \(B(\tau,u)\) is:
+The solution for $B(\tau,u)$ is:
 
 $$ B(\tau,u) = \frac{2iu(1 - e^{-\gamma\tau})}{(\gamma + \kappa)(e^{\gamma\tau} - 1) + 2\gamma} $$
 
-Integrating the Riccati equation for \(A(\tau,u)\) gives:
+Integrating the Riccati equation for $A(\tau,u)$ gives:
 
 $$ A(\tau,u) = \frac{\kappa\bar{v}}{\sigma^2}\left[(\kappa - \gamma)\tau - 2\ln\left(1-\frac{\kappa-\gamma}{2\gamma}(1-e^{-\gamma\tau})\right)\right] $$
 
@@ -179,7 +179,7 @@ This result is directly used in W4 for pricing VIX futures and VIX options.
 
 ### One-Factor Structure of Heston
 
-The Heston model is a one-factor stochastic volatility model because a single latent variance process \(v_t\) drives both:
+The Heston model is a one-factor stochastic volatility model because a single latent variance process $v_t$ drives both:
 
 - the SPX implied volatility surface,
 - and the VIX futures term structure.
