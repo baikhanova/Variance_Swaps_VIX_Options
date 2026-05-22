@@ -7,11 +7,11 @@ This section describes the Monte Carlo component of the project. The purpose of 
 
 Under the risk-neutral measure $\mathbb{Q}$, the Heston model is written as
 \begin{align}
-\frac{dS_t}{S_t} &= (r-q)dt + \sqrt{v_t}\,dW_t^S, \\
+\frac{dS_t}{S_t} &= rdt + \sqrt{v_t}\,dW_t^S, \\
 dv_t &= \kappa(\theta-v_t)dt + \sigma_v\sqrt{v_t}\,dW_t^v, \\
 d\langle W^S,W^v\rangle_t &= \rho\,dt.
 \end{align}
-Here, $S_t$ denotes the underlying asset price and $v_t$ denotes the instantaneous variance. The parameters $r$ and $q$ represent the risk-free rate and dividend yield, while $\kappa$, $\theta$, and $\sigma_v$ describe the mean-reversion speed, long-run variance, and volatility of variance. The parameter $\rho$ controls the instantaneous correlation between the asset and variance Brownian motions.
+Here, $S_t$ denotes the underlying asset price and $v_t$ denotes the instantaneous variance. The parameter $r$ represents the risk-free rate, while $\kappa$, $\theta$, and $\sigma_v$ describe the mean-reversion speed, long-run variance, and volatility of variance. The parameter $\rho$ controls the instantaneous correlation between the asset and variance Brownian motions.
 
 The square-root variance process is attractive because it preserves non-negativity in continuous time and introduces stochastic volatility in a parsimonious way. However, numerical simulation of square-root diffusions requires care near the zero boundary. Recent work on simulation schemes for Heston and related square-root processes emphasises that discretisation choices can materially affect pricing accuracy, especially for variance-sensitive derivatives \citep{choikwok2024heston,abijaber2024squareroot}.
 
