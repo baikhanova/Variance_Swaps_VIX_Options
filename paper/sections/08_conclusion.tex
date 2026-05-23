@@ -1,0 +1,30 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+This project studied volatility as a tradable asset class through variance swaps, model-implied VIX derivatives, and numerical pricing under stochastic volatility. The main objective was to connect the theoretical structure of volatility-linked products with working numerical methods that can later be extended to real market data, empirical calibration, hedging analysis, and volatility risk premium backtesting.
+
+The first part of the project reviewed the role of volatility derivatives in modern financial markets. Variance swaps, VIX futures, and VIX options provide direct exposure to volatility and variance rather than only to the direction of the underlying asset. This motivates a modelling framework in which variance is treated as a stochastic state variable. The Heston model was used as the baseline framework because its variance process is mean-reverting, non-negative in continuous time, and analytically tractable enough for both simulation and characteristic-function-based pricing.
+
+The theoretical part derived the key formulas required for the numerical implementation. The fair variance swap strike was obtained from the expected integrated variance under the Heston/CIR variance process. The project also constructed a model-implied VIX proxy based on the conditional expectation of future variance. This distinction is important because the proxy used in the project is not the official Cboe VIX index. Instead, it is a Heston-implied quantity of the form
+\[
+\widetilde{\mathrm{VIX}}_T
+=
+100\sqrt{A_\Delta+B_\Delta v_T}.
+\]
+This representation allowed VIX-type payoffs to be expressed as functions of terminal variance.
+
+The W3 component implemented the Monte Carlo engine. It simulated Heston stock and variance paths using a full-truncation Euler scheme, computed realised variance from squared log returns, and compared the simulated realised variance with the analytical Heston variance swap strike. This comparison served as the first validation step for the simulation engine. The same Monte Carlo framework was also used to price a model-implied VIX call by transforming terminal variance into VIX and averaging discounted payoffs.
+
+The W4 component implemented the CIR-based COS pricing engine. The method used the characteristic function of terminal CIR variance and approximated the expected payoff through a Fourier-cosine expansion. This provided a deterministic semi-analytical benchmark for the Monte Carlo VIX call price. The COS framework was also used for density recovery, VIX call and put pricing, VIX futures term-structure calculation, and convergence checks with respect to the number of terms and truncation interval.
+
+The numerical comparison between the Monte Carlo and COS engines showed close agreement under the same parameter set. The reported COS price was approximately \(2.008969\), while the Monte Carlo price was approximately \(1.984952\). The absolute difference was \(0.024017\), corresponding to a relative difference of about \(1.21\%\). This result supports the internal consistency of the two independently implemented pricing methods. The difference is reasonable because Monte Carlo contains sampling and discretisation error, while the COS method contains truncation and finite-series approximation error.
+
+The main contribution of the completed W1--W4 work is therefore a coherent numerical foundation for volatility-linked derivatives. The project now contains a theoretical framework, a simulation-based pricing engine, a characteristic-function-based pricing engine, validation checks, and a modular code structure. These elements prepare the project for later stages involving market data, calibration, hedging analysis, and empirical testing.
+
+Several limitations remain. First, the current results are based on synthetic parameters rather than market-calibrated parameters. Second, the VIX object used in the project is a model-implied proxy, not the official Cboe VIX index. Third, the one-factor Heston/CIR structure may not be flexible enough to reproduce the full SPX volatility surface and VIX term structure simultaneously. Fourth, the current project has not yet performed a full empirical volatility risk premium backtest. These limitations are expected at the current stage and define the natural direction for future work.
+
+Future extensions should focus on the remaining project stages. In W5 and W6, the project should move from synthetic parameters to real market data and calibration. These stages are expected to connect the model to VIX index levels, VIX futures, VIX options, SPX returns, and risk-free rate data. After calibration, the project can compare model prices with market prices and evaluate whether a one-factor variance model is sufficient. If the one-factor Heston/CIR model is not flexible enough, the framework can also be extended to two-factor CIR models or rough volatility specifications.
+
+W7 and W8 should continue the empirical and practical parts of the project. In particular, these later stages can extend the framework toward hedging analysis, volatility risk premium backtesting, final performance evaluation, and interpretation of trading or risk-management implications. The volatility risk premium component should compare implied variance with subsequently realised variance and evaluate whether a systematic volatility strategy can be justified by the model outputs. The hedging component can then assess how model-based prices and sensitivities behave under realistic market movements.
+
+Overall, the completed work establishes the numerical core of the project. The Monte Carlo engine provides flexibility and path-based validation, while the COS engine provides speed and deterministic cross-checking. Together, they form a consistent framework for modelling and pricing volatility-linked derivatives before moving to real data, calibration, hedging, and empirical volatility risk premium analysis.
