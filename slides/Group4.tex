@@ -99,34 +99,59 @@
 \column{0.48\textwidth}
 \textbf{Heston model \& variance swap}
 \begin{itemize}
-  \item Heston SDE:\; $dv_t = \kappa(\theta - v_t)\,dt + \sigma\sqrt{v_t}\,dW_t$
-  \item Discounted stock is $\mathbb{Q}$-martingale:\; $\mathbb{E}^{\mathbb{Q}}[e^{-rT}S_T] = S_0$
-  \item Variance swap fair strike:
+  \item Heston variance process:
   \[
-    K_{\mathrm{var}} = \theta + \frac{(v_0 - \theta)(1 - e^{-\kappa T})}{\kappa T}
+    dv_t = \kappa(\theta-v_t)\,dt+\sigma_v\sqrt{v_t}\,dW_t
   \]
-  \item Derivation via It\^o's lemma on $\ln S_t$ and replication portfolio
+
+  \item Discounted stock is a $\mathbb{Q}$-martingale:
+  \[
+    \mathbb{E}^{\mathbb{Q}}[e^{-rT}S_T]=S_0
+  \]
+
+  \item Fair variance swap strike:
+  \[
+    K_{\mathrm{var}}
+    =
+    \theta+
+    \frac{(v_0-\theta)(1-e^{-\kappa T})}{\kappa T}
+  \]
 \end{itemize}
 
 \column{0.48\textwidth}
 \textbf{VIX affine formula}
 \begin{itemize}
-  \item $\mathrm{VIX}_t^2$ affine in $v_t$ under Heston:
+  \item Model-implied VIX proxy:
   \[
-    \mathrm{VIX}_t^2 = \frac{1}{\Delta}\,\mathbb{E}_t^{\mathbb{Q}}\!\Bigl[\int_t^{t+\Delta}\! v_s\,ds\Bigr] = \theta + (v_t - \theta)\,B(\kappa,\Delta)
+    \widetilde{\mathrm{VIX}}_t^2
+    =
+    100^2
+    \frac{1}{\Delta}
+    \mathbb{E}_t^{\mathbb{Q}}
+    \left[
+    \int_t^{t+\Delta}v_s\,ds
+    \right]
   \]
-  \item $B = \frac{1 - e^{-\kappa\Delta}}{\kappa\Delta}$ \;(mean-reversion weight)
-  \item $\mathrm{VIX}_t = 100\sqrt{A + B\cdot v_t}$,\; $A = \theta(1-B)$
+
+  \item Under Heston/CIR:
+  \[
+    \widetilde{\mathrm{VIX}}_t
+    =
+    100\sqrt{A+Bv_t}
+  \]
+  \[
+    B=\frac{1-e^{-\kappa\Delta}}{\kappa\Delta},
+    \qquad
+    A=\theta(1-B)
+  \]
 \end{itemize}
 \end{columns}
 
-\vspace{6pt}
-\begin{block}{Joint Calibration Problem --- Why Heston Fails?}
-\begin{itemize}
-  \item One-factor: $v_t$ drives both SPX implied vol and VIX term structure simultaneously
-  \item Fitting SPX surface requires specific $(\kappa, \sigma_v)$; VIX curve then deviates from market
-  \item Resolution: two-factor CIR ($v_t = v_t^{(1)} + v_t^{(2)}$) or rough Heston
-\end{itemize}
+\vspace{3pt}
+\begin{block}{Joint Calibration Problem --- Why One-Factor Heston Fails}
+\small
+One variance factor must fit both the SPX volatility surface and the VIX term structure.
+In practice, this often motivates two-factor CIR or rough volatility extensions.
 \end{block}
 \end{frame}
 
@@ -202,49 +227,72 @@ Boundary check: $\varphi(0;\tau)=1$ \;\checkmark\qquad $|\varphi(u;\tau)|\le 1$ 
 % ── Slide 7: COS Engine ──
 \begin{frame}{W4 -- Fourier/COS Pricing Engine \;(\texttt{vix\_cos.py})}
 
-\textbf{Core idea:} express the expected payoff as a Fourier-cosine series using the known characteristic function of terminal variance.
+\textbf{Core idea:} use the characteristic function of terminal variance to approximate the expected VIX payoff by a Fourier-cosine expansion.
 
-\begin{columns}[T]
-\column{0.35\textwidth}
+\vspace{6pt}
+
+\begin{columns}[T,totalwidth=\textwidth]
+
+\column{0.36\textwidth}
 \textbf{COS density recovery}
+
+\vspace{2pt}
+{\scriptsize
 \[
   f(v)
   \approx
   \sideset{}{'}\sum_{k=0}^{N-1}
-  \frac{2}{b-a}
-  \mathrm{Re}\!\left[
-  \varphi_{v_T}\!\left(\frac{k\pi}{b-a}\right)
-  e^{-ik\pi a/(b-a)}
-  \right]
-  \cos\!\left(\frac{k\pi(v-a)}{b-a}\right)
+  A_k
+  \cos\left(
+  \frac{k\pi(v-a)}{b-a}
+  \right)
 \]
-Density integrates to 1 within 0.5\%.
+}
 
-\column{0.35\textwidth}
+{\small
+where \(A_k\) is computed from the terminal CIR characteristic function.
+}
+
+\column{0.36\textwidth}
 \textbf{Expected payoff via COS}
+
+\vspace{2pt}
+{\scriptsize
 \[
   \mathbb{E}[g(v_T)]
   \approx
   \sideset{}{'}\sum_{k=0}^{N-1}
-  \mathrm{Re}\!\left[
-  \varphi_{v_T}\!\left(\frac{k\pi}{b-a}\right)
-  e^{-ik\pi a/(b-a)}
-  \right]V_k
+  A_k V_k
 \]
-$V_k$ = payoff cosine coefficient.\\
-Vectorised: $O(N\!\cdot\!M)$.
+}
 
-\column{0.28\textwidth}
+{\small
+\(V_k\) is the payoff cosine coefficient. The computation is vectorised as \(O(N\cdot M)\).
+}
+
+\column{0.24\textwidth}
 \textbf{Pricing functions}
-\begin{itemize}\small
-  \item \texttt{price\_vix\_call\_cos}
-  \item \texttt{price\_vix\_put\_cos}
-  \item \texttt{price\_vix\_futures\_cos}
-\end{itemize}
-\end{columns}
 
 \vspace{4pt}
-\textbf{Truncation interval:}\; $a=0$ (CIR non-negative),\; $b = \mu + L\sigma$ ($L=8$ std widths), based on closed-form CIR moments.
+{\scriptsize
+\begin{tabular}{@{}l@{}}
+\texttt{price\_vix\_call\_cos} \\[5pt]
+\texttt{price\_vix\_put\_cos} \\[5pt]
+\texttt{price\_vix\_futures\_cos}
+\end{tabular}
+}
+
+\end{columns}
+
+\vspace{8pt}
+
+\textbf{Truncation interval:}\;
+\(a=0\) because CIR variance is non-negative, and
+\[
+  b=\mu+L\sigma,
+  \qquad L=8.
+\]
+
 \end{frame}
 
 % ── Slide 8: COS Algorithm Step-by-Step ──
@@ -382,11 +430,10 @@ Model VIX futures via COS:\; $F(0,T)=\mathbb{E}^{\mathbb{Q}}\!\bigl[100\sqrt{A+B
 
 \textbf{\texttt{src/pricing/vix\_cos.py}}
 \begin{itemize}\footnotesize
-  \item \texttt{COSSettings} dataclass ($N$, std\_width, grid\_size)
-  \item \texttt{\_cos\_payoff\_coefficients} --- vectorised ($N\!\times\!M$ matrix)
-  \item \texttt{\_cos\_expected\_payoff} --- COS summation kernel
-  \item \texttt{price\_vix\_call/put\_cos} --- European option prices
-  \item \texttt{price\_vix\_futures\_cos} --- VIX futures $F(0,T)$
+  \item \texttt{COSSettings} dataclass
+  \item vectorised payoff coefficients
+  \item COS expected-payoff kernel
+  \item VIX call, put, and futures pricing
 \end{itemize}
 
 \column{0.48\textwidth}
@@ -474,10 +521,6 @@ Model VIX futures via COS:\; $F(0,T)=\mathbb{E}^{\mathbb{Q}}\!\bigl[100\sqrt{A+B
 \checkmark\; error decreases with $N$\\
 \checkmark\; truncation-width columns
 
-\medskip
-\textbf{Term structure}\\
-\checkmark\; 8 maturities\\
-\checkmark\; monotone under mean-reversion
 \end{columns}
 \end{frame}
 
@@ -529,7 +572,8 @@ The two methods provide cross-validation for the pricing engine.
   VIX affine & $\widetilde{\mathrm{VIX}}_t = 100\sqrt{A+Bv_t}$,\;\; $B=\dfrac{1-e^{-\kappa\Delta}}{\kappa\Delta}$,\;\; $A=\theta(1-B)$ \\
   CIR terminal CF & $\varphi_{v_T}(u)=(1-2iu c_T)^{-d/2}\exp\!\left(\dfrac{iu c_T\lambda_T}{1-2iu c_T}\right)$ \\
   CIR integrated CF & $\tilde\varphi(u;\tau) = \exp\!\bigl(A(\tau)+B(\tau)\cdot v_0\bigr)$,\;\; $B = \dfrac{2iu(1-e^{-\gamma\tau})}{D(\tau)}$ \\
-  COS option price & $C = e^{-rT}\displaystyle\sideset{}{'}\sum_{k=0}^{N-1}\mathrm{Re}\!\bigl[\varphi_k\, e^{-ik\pi a/(b-a)}\bigr]\cdot V_k$ \\
+  COS option price & $C=e^{-rT}\displaystyle\sideset{}{'}\sum_{k=0}^{N-1}
+\mathrm{Re}\!\left[\varphi_{v_T}\!\left(\dfrac{k\pi}{b-a}\right)e^{-ik\pi a/(b-a)}\right]V_k$ \\
   VIX futures & $F(0,T)=\mathbb{E}^{\mathbb{Q}}\!\bigl[100\sqrt{A+B\cdot v_T}\bigr]$ \\
   VRP definition & $\mathrm{VRP}_t = \mathrm{IV}_t^2 - \mathbb{E}_t^{\mathbb{P}}[\mathrm{RV}_{t,t+\Delta}]$ \;(positive $\Rightarrow$ overpay for vol) \\
   \bottomrule
@@ -549,7 +593,7 @@ The two methods provide cross-validation for the pricing engine.
 \checkmark\; W2 --- CIR CF derived via Feynman--Kac / Riccati ODE\\[2pt]
 \checkmark\; W2 --- One-factor joint calibration failure argument\\[2pt]
 \checkmark\; W3 --- Heston path simulation + realised variance $\mathrm{RV}_{0,T}$\\[2pt]
-\checkmark\; W3 --- Variance swap: MC $\mathbb{E}[\mathrm{RV}]$ vs.\ $K_{\mathrm{var}}$ (match within 1\%)
+\checkmark\; W3 --- Variance swap: MC $\mathbb{E}[\mathrm{RV}]$ vs.\ $K_{\mathrm{var}}$
 
 \column{0.48\textwidth}
 \checkmark\; W3 --- VIX call option by Monte Carlo\\[2pt]
@@ -595,7 +639,7 @@ The two methods provide cross-validation for the pricing engine.
   \checkmark\; W4: COS pricing engine for VIX call, put, and futures --- validated, 27 tests passing\\[4pt]
   \checkmark\; VIX term structure reproduces correct contango / backwardation under CIR dynamics\\[4pt]
   \checkmark\; COS convergence checked with respect to the number of terms and truncation width\\[12pt]
-  \Large\textbf{Ready for W5--W6: real data calibration, hedging, and alpha backtest}
+  \medium\textbf{Ready for W5--W6: real data calibration, hedging, and alpha backtest}
 \end{minipage}
 \end{center}
 \end{frame}
