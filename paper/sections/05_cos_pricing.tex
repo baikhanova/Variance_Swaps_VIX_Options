@@ -1,102 +1,102 @@
-\section{CIR-Based COS Pricing of VIX Derivatives}
+\section{CIR-Based COS Pricing Framework}
 \label{sec:cos_pricing}
 
-Fourier-based pricing methods are useful when the characteristic function is available even if the transition density is not directly used in closed form \citep{hirsa2024}. The COS method is particularly attractive because it approximates the pricing integral through a finite cosine expansion and can converge rapidly when the truncation interval is chosen appropriately \citep{junike2022cos,junike2024cos}.
+This section presents the Fourier-cosine pricing component of the project. The purpose of the W4 implementation is to provide a deterministic semi-analytical pricing engine for model-implied VIX derivatives. Unlike Monte Carlo simulation, which estimates expectations through random sampling, the COS method approximates the pricing integral using the characteristic function of the relevant state variable. In this project, the state variable is the terminal CIR variance \(v_T\).
 
-This section develops the Fourier-cosine pricing framework used for VIX derivatives. The purpose of this part is to provide a deterministic semi-analytical benchmark for the Monte Carlo prices obtained in Section~\ref{sec:monte_carlo}. Transform methods are widely used in computational finance because characteristic functions are often available even when the transition density is not available in closed form \citep{hirsa2024}. The COS method is particularly suitable in this setting because it approximates the pricing integral through a finite cosine expansion and can converge rapidly when the truncation interval is chosen appropriately \citep{junike2022cos,junike2024cos}.
+Fourier-based pricing methods are useful when the characteristic function is available even if the transition density is not directly used in closed form \citep{hirsa2024}. The COS method is particularly attractive because it approximates the density and expected payoff through a finite cosine expansion. Recent work on the COS method emphasises that both the truncation interval and the number of cosine terms are central numerical choices for pricing accuracy \citep{junike2022cos,junike2024cos}.
 
-\subsection{Terminal CIR Distribution}
+\subsection{Purpose of the COS Engine}
 
-Under the Heston model, the variance process follows a Cox--Ingersoll--Ross process:
+The COS engine has three main purposes in the project. First, it provides a pricing method for VIX call and put options under the model-implied VIX proxy. Second, it gives a deterministic benchmark for the Monte Carlo VIX call price from Section~\ref{sec:monte_carlo}. Third, it supports additional validation through density recovery and convergence checks.
+
+The method is well suited to the present setting because the terminal variance \(v_T\) has a known characteristic function under the CIR process. Since the model-implied VIX is written as
 \begin{equation}
-dv_t=\kappa(\theta-v_t)dt+\sigma_v\sqrt{v_t}\,dW_t^v.
+\widetilde{\mathrm{VIX}}_T
+=
+100\sqrt{A_\Delta+B_\Delta v_T},
 \end{equation}
-For a fixed maturity $T$, the terminal variance has a scaled non-central chi-square distribution:
+a VIX derivative payoff can be treated as a deterministic function of terminal variance. This allows pricing to be formulated as an expectation over \(v_T\).
+
+\subsection{Terminal CIR Characteristic Function}
+
+The variance process in the Heston model follows the CIR dynamics
 \begin{equation}
-v_T \sim c_T\chi^2_d(\lambda_T),
+dv_t
+=
+\kappa(\theta-v_t)dt+\sigma_v\sqrt{v_t}\,dW_t^v.
+\end{equation}
+For maturity \(T\), the terminal variance has the scaled non-central chi-square representation
+\begin{equation}
+v_T
+\sim
+c_T\chi_d^2(\lambda_T),
 \end{equation}
 where
 \begin{align}
-c_T &= \frac{\sigma_v^2(1-e^{-\kappa T})}{4\kappa},\\
-d &= \frac{4\kappa\theta}{\sigma_v^2},\\
+c_T
+&=
+\frac{\sigma_v^2(1-e^{-\kappa T})}{4\kappa},\\
+d
+&=
+\frac{4\kappa\theta}{\sigma_v^2},\\
 \lambda_T
 &=
 \frac{4\kappa e^{-\kappa T}v_0}
 {\sigma_v^2(1-e^{-\kappa T})}.
 \end{align}
-
-The characteristic function of $v_T$ is therefore
+The corresponding characteristic function is
 \begin{equation}
 \boxed{
-\phi_{v_T}(u)
+\varphi_{v_T}(u)
 =
 (1-2iu c_T)^{-d/2}
 \exp\left(
 \frac{iu c_T\lambda_T}{1-2iu c_T}
 \right).
 }
-\end{equation}
-This is the characteristic function used in the COS method. It is important that this terminal variance characteristic function is not confused with the transform of integrated variance. The terminal variance $v_T$ is used for VIX derivative pricing, whereas integrated variance is used for variance swap valuation.
-
-\subsection{State Variable and Payoff}
-
-The pricing state variable in the COS implementation is the terminal variance:
-\begin{equation}
-X=v_T.
-\end{equation}
-The Heston-implied VIX proxy is then obtained from
-\begin{equation}
-\widetilde{\mathrm{VIX}}_T
-=
-100\sqrt{A_\Delta+B_\Delta v_T},
-\end{equation}
-where
-\begin{align}
-B_\Delta &= \frac{1-e^{-\kappa\Delta}}{\kappa\Delta},\\
-A_\Delta &= \theta(1-B_\Delta).
-\end{align}
-
-For a VIX call with strike $K$, the payoff as a function of terminal variance is
-\begin{equation}
-g_{\mathrm{call}}(v)
-=
-\left(
-100\sqrt{A_\Delta+B_\Delta v}
--
-K
-\right)^+.
-\end{equation}
-For a VIX put, the payoff is
-\begin{equation}
-g_{\mathrm{put}}(v)
-=
-\left(
-K
--
-100\sqrt{A_\Delta+B_\Delta v}
-\right)^+.
+\label{eq:cos_terminal_cf}
 \end{equation}
 
-\subsection{COS Approximation}
+This is the characteristic function used in the COS pricing engine. It is important to distinguish this terminal variance characteristic function from the transform of integrated variance. Variance swaps depend on the integrated variance \(\int_0^T v_s\,ds\), whereas the VIX option payoff in this implementation depends on terminal variance through the model-implied VIX proxy.
 
-Let $X$ be a random variable with characteristic function $\phi_X(u)$ and let $[a,b]$ be a finite truncation interval. The density of $X$ is approximated by the Fourier-cosine expansion
+\subsection{COS Representation of the Density}
+
+Let \(X\) be a random variable with density \(f_X(x)\) and characteristic function \(\varphi_X(u)\). The COS method approximates the density on a finite interval \([a,b]\) by a Fourier-cosine expansion:
 \begin{equation}
 f_X(x)
 \approx
 \sideset{}{'}\sum_{k=0}^{N-1}
-\frac{2}{b-a}
-\operatorname{Re}
-\left[
-\phi_X\left(\frac{k\pi}{b-a}\right)
-e^{-i k\pi a/(b-a)}
-\right]
+A_k
 \cos\left(
 \frac{k\pi(x-a)}{b-a}
 \right),
+\label{eq:cos_density_general}
 \end{equation}
-where the prime indicates that the first term is multiplied by one half.
+where the prime indicates that the first term is multiplied by one half. The coefficients are obtained from the characteristic function:
+\begin{equation}
+A_k
+=
+\frac{2}{b-a}
+\operatorname{Re}
+\left[
+\varphi_X\left(\frac{k\pi}{b-a}\right)
+e^{-ik\pi a/(b-a)}
+\right].
+\label{eq:cos_density_coefficients}
+\end{equation}
 
-For a payoff $g(X)$, the discounted price is approximated by
+In this project, \(X=v_T\), so \(\varphi_X=\varphi_{v_T}\). The approximation in \eqref{eq:cos_density_general} is therefore applied to the terminal CIR variance density. This density recovery is not only useful for interpretation, but also serves as a numerical check that the characteristic function and truncation interval are implemented consistently.
+
+\subsection{COS Pricing Formula}
+
+For a derivative payoff \(g(X)\), the time-zero price under the risk-neutral measure is
+\begin{equation}
+V_0
+=
+e^{-rT}
+\mathbb{E}^{\mathbb{Q}}[g(X)].
+\end{equation}
+Using the COS density approximation, this expectation can be approximated as
 \begin{equation}
 V_0
 \approx
@@ -104,12 +104,13 @@ e^{-rT}
 \sideset{}{'}\sum_{k=0}^{N-1}
 \operatorname{Re}
 \left[
-\phi_X\left(\frac{k\pi}{b-a}\right)
-e^{-i k\pi a/(b-a)}
+\varphi_X\left(\frac{k\pi}{b-a}\right)
+e^{-ik\pi a/(b-a)}
 \right]
 G_k,
+\label{eq:cos_price_general}
 \end{equation}
-where the payoff coefficient is
+where
 \begin{equation}
 G_k
 =
@@ -118,140 +119,193 @@ G_k
 g(x)
 \cos\left(
 \frac{k\pi(x-a)}{b-a}
-\right)dx.
+\right)
+dx
+\label{eq:cos_payoff_coefficient}
+\end{equation}
+is the payoff cosine coefficient.
+
+The expression in \eqref{eq:cos_price_general} is the main pricing formula used by the COS engine. It separates the distributional part, represented by the characteristic function, from the payoff part, represented by \(G_k\). This separation is one of the reasons Fourier-based methods are efficient for repeated pricing across different strikes.
+
+\subsection{VIX Call and Put Payoffs}
+
+In the current implementation, the model-implied VIX proxy is
+\begin{equation}
+\widetilde{\mathrm{VIX}}_T
+=
+100\sqrt{A_\Delta+B_\Delta v_T}.
+\end{equation}
+Therefore, the payoff of a VIX call with strike \(K\) can be written as a function of terminal variance:
+\begin{equation}
+g_{\mathrm{call}}(v)
+=
+\left(
+100\sqrt{A_\Delta+B_\Delta v}-K
+\right)^+.
+\label{eq:cos_call_payoff}
+\end{equation}
+Similarly, the payoff of a VIX put is
+\begin{equation}
+g_{\mathrm{put}}(v)
+=
+\left(
+K-100\sqrt{A_\Delta+B_\Delta v}
+\right)^+.
+\label{eq:cos_put_payoff}
 \end{equation}
 
-In this project, $X=v_T$ and $\phi_X=\phi_{v_T}$. The payoff coefficients are computed numerically because the VIX payoff is nonlinear in terminal variance.
-
-The numerical accuracy of the COS method depends on two related choices: the number of cosine terms $N$ and the truncation interval $[a,b]$. Recent studies show that the truncation range cannot be treated as a purely mechanical parameter, because an interval that is too narrow may exclude relevant probability mass, while an excessively wide interval may slow convergence \citep{junike2022cos}. The number of terms must also be selected with respect to the payoff shape and the distributional properties of the underlying state variable \citep{junike2024cos}.
-
-\subsection{COS Price of a VIX Call}
-
-The COS approximation of a VIX call price is
+The call and put prices are then computed by substituting these payoff functions into the COS pricing formula. For the call,
 \begin{equation}
-C^{COS}_0(K,T)
-=
+C_0^{COS}(K,T)
+\approx
 e^{-rT}
 \sideset{}{'}\sum_{k=0}^{N-1}
 \operatorname{Re}
 \left[
-\phi_{v_T}\left(\frac{k\pi}{b-a}\right)
-e^{-i k\pi a/(b-a)}
+\varphi_{v_T}\left(\frac{k\pi}{b-a}\right)
+e^{-ik\pi a/(b-a)}
 \right]
-G_k^{call},
+G_k^{\mathrm{call}},
+\label{eq:cos_call_price}
 \end{equation}
 where
 \begin{equation}
-G_k^{call}
+G_k^{\mathrm{call}}
 =
 \frac{2}{b-a}
 \int_a^b
 \left(
-100\sqrt{A_\Delta+B_\Delta v}
--
-K
+100\sqrt{A_\Delta+B_\Delta v}-K
 \right)^+
 \cos\left(
 \frac{k\pi(v-a)}{b-a}
-\right)dv.
+\right)
+dv.
 \end{equation}
-
-Similarly, the put price is
+The put price is computed analogously:
 \begin{equation}
-P^{COS}_0(K,T)
-=
+P_0^{COS}(K,T)
+\approx
 e^{-rT}
 \sideset{}{'}\sum_{k=0}^{N-1}
 \operatorname{Re}
 \left[
-\phi_{v_T}\left(\frac{k\pi}{b-a}\right)
-e^{-i k\pi a/(b-a)}
+\varphi_{v_T}\left(\frac{k\pi}{b-a}\right)
+e^{-ik\pi a/(b-a)}
 \right]
-G_k^{put},
+G_k^{\mathrm{put}}.
+\label{eq:cos_put_price}
 \end{equation}
-where
-\begin{equation}
-G_k^{put}
-=
-\frac{2}{b-a}
-\int_a^b
-\left(
-K
--
-100\sqrt{A_\Delta+B_\Delta v}
-\right)^+
-\cos\left(
-\frac{k\pi(v-a)}{b-a}
-\right)dv.
-\end{equation}
+
+In the current implementation, the payoff coefficients are computed numerically. This is practical because the VIX payoff contains a square-root transformation of terminal variance. Closed-form payoff coefficients may be considered in future work to improve computational efficiency.
 
 \subsection{Truncation Interval}
 
-The truncation interval is a critical input in the COS method. If the interval is too narrow, relevant probability mass may be excluded; if it is too wide, the cosine approximation may become less efficient. For this reason, recent COS-method literature treats interval selection and the number of expansion terms as key accuracy controls \citep{junike2022cos,junike2024cos}.
-
-The COS method requires a finite interval $[a,b]$. Since the CIR variance process is non-negative, the lower bound is set to
+A central practical issue in the COS method is the selection of the truncation interval \([a,b]\). Since CIR variance is non-negative, the lower bound is chosen as
 \begin{equation}
 a=0.
 \end{equation}
-The upper bound is chosen to include most of the probability mass of $v_T$. A practical choice is
+The upper bound is selected using the mean and standard deviation of terminal variance:
 \begin{equation}
 b
 =
 \mathbb{E}^{\mathbb{Q}}[v_T]
 +
-L\sqrt{\operatorname{Var}^{\mathbb{Q}}(v_T)},
+L\sqrt{\operatorname{Var}^{\mathbb{Q}}(v_T)}.
+\label{eq:cos_truncation}
 \end{equation}
-where $L$ is a truncation-width parameter. The mean of terminal variance is
-\begin{equation}
-\mathbb{E}^{\mathbb{Q}}[v_T]
-=
-\theta+(v_0-\theta)e^{-\kappa T}.
-\end{equation}
+Here, \(L>0\) controls the width of the interval. In the implementation, \(L=8\) is used as a practical benchmark setting.
 
-The truncation interval is a critical numerical input. Increasing the number of COS terms $N$ improves the cosine approximation only if the interval already captures the relevant part of the distribution. Therefore, convergence is checked with respect to both $N$ and the interval width. This follows the recent COS-method literature, where the truncation range and the number of expansion terms are treated as central sources of numerical accuracy rather than secondary implementation details \citep{junike2022cos,junike2024cos}.
+The truncation interval is a critical input in the COS method. If the interval is too narrow, relevant probability mass may be excluded. If the interval is too wide, the approximation may become less efficient because the cosine expansion must represent the function over a larger range. For this reason, recent COS-method literature treats interval selection and the number of expansion terms as key accuracy controls \citep{junike2022cos,junike2024cos}.
 
-\subsection{Density Recovery}
+\subsection{Density Recovery Check}
 
-The same COS expansion can be used to recover the terminal variance density:
+The COS engine also includes a density recovery check. Using the coefficients in \eqref{eq:cos_density_coefficients}, the recovered terminal variance density is
 \begin{equation}
 \widehat{f}_{v_T}(v)
 =
 \sideset{}{'}\sum_{k=0}^{N-1}
-\frac{2}{b-a}
-\operatorname{Re}
-\left[
-\phi_{v_T}\left(\frac{k\pi}{b-a}\right)
-e^{-i k\pi a/(b-a)}
-\right]
+A_k
 \cos\left(
 \frac{k\pi(v-a)}{b-a}
 \right).
+\label{eq:cos_recovered_density}
 \end{equation}
-The recovered density is validated by checking that
+A basic consistency check is that the recovered density integrates approximately to one:
 \begin{equation}
-\int_a^b \widehat{f}_{v_T}(v)\,dv \approx 1
+\int_a^b
+\widehat{f}_{v_T}(v)\,dv
+\approx
+1.
 \end{equation}
-and that the recovered first moment is close to
+The first moment can also be compared with the analytical CIR mean:
 \begin{equation}
 \mathbb{E}^{\mathbb{Q}}[v_T]
 =
 \theta+(v_0-\theta)e^{-\kappa T}.
 \end{equation}
-These checks ensure that the characteristic function, the truncation interval, and the cosine expansion are implemented consistently.
+
+These checks are important because the COS method relies on both the characteristic function and the truncation interval. A pricing result may appear numerically reasonable even if the recovered density is poorly normalised. Density recovery provides an additional diagnostic tool before interpreting option prices.
+
+\subsection{VIX Futures Term Structure}
+
+The COS framework can also be used to compute a model-implied VIX futures level. Since a futures level is an expected future index level under the risk-neutral measure, the model-implied VIX futures value is
+\begin{equation}
+F(0,T)
+=
+\mathbb{E}^{\mathbb{Q}}
+\left[
+100\sqrt{A_\Delta+B_\Delta v_T}
+\right].
+\label{eq:vix_futures}
+\end{equation}
+There is no discount factor in this expression because a futures price is quoted as a forward level rather than as a discounted payoff.
+
+The VIX term structure reflects mean reversion in the CIR variance process. If \(v_0>\theta\), variance is expected to decline toward its long-run level, producing a downward-sloping curve. This corresponds to backwardation. If \(v_0<\theta\), variance is expected to rise toward its long-run level, producing an upward-sloping curve. This corresponds to contango.
+
+\subsection{Convergence with Respect to COS Terms}
+
+The number of COS terms \(N\) controls the resolution of the cosine expansion. A small value of \(N\) may produce a poor approximation, while a very large value increases computation without necessarily improving the result if truncation error dominates. Therefore, the implementation studies convergence by computing prices for increasing values of \(N\).
+
+The expected behaviour is that prices stabilise as \(N\) increases. In practice, this stabilisation must be assessed together with the truncation interval. Increasing \(N\) cannot correct an interval that excludes relevant probability mass. For this reason, the convergence study considers both \(N\) and the truncation-width parameter \(L\).
 
 \subsection{Comparison with Monte Carlo}
 
-The COS method produces a deterministic semi-analytical price, while Monte Carlo produces a simulation-based estimate with sampling uncertainty. The two methods are compared using the absolute error
+The COS price is compared with the Monte Carlo price from Section~\ref{sec:monte_carlo}. The absolute difference is
 \begin{equation}
 \mathrm{AbsError}
 =
-|C^{COS}_0-C^{MC}_0|
+\left|
+C_0^{COS}
+-
+C_0^{MC}
+\right|,
 \end{equation}
-and the relative error
+and the relative difference is
 \begin{equation}
 \mathrm{RelError}
 =
-\frac{|C^{COS}_0-C^{MC}_0|}{C^{MC}_0}.
+\frac{
+\left|
+C_0^{COS}
+-
+C_0^{MC}
+\right|
+}{
+C_0^{MC}
+}.
 \end{equation}
 
-A small difference between the COS and Monte Carlo prices provides numerical cross-validation. If the difference is larger than expected, the possible sources are Monte Carlo sampling error, time-discretisation bias, an insufficient COS truncation interval, or an insufficient number of cosine terms. For this reason, the validation procedure checks both Monte Carlo convergence and COS convergence before interpreting the final pricing difference.
+This comparison is useful because the two methods have different sources of numerical error. Monte Carlo contains sampling and time-discretisation error. COS contains truncation error and series approximation error. If both methods produce close prices under the same parameter set, the result supports the internal consistency of the numerical implementation.
+
+\subsection{Interpretation of W4 Implementation}
+
+The W4 implementation extends the project from simulation-based pricing to characteristic-function-based pricing. This is an important methodological step because it introduces a deterministic benchmark that can be used for repeated pricing and validation. The COS engine also makes it possible to recover the terminal variance density and to study the model-implied VIX term structure.
+
+The main practical advantage of the COS method is speed once the characteristic function is available. The main practical challenge is numerical accuracy, especially the selection of the truncation interval and the number of expansion terms. The implementation addresses this by including convergence checks and density recovery diagnostics.
+
+\subsection{Limitations of the COS Engine}
+
+The current COS engine has several limitations. First, the payoff coefficients are computed numerically rather than in closed form. This is acceptable for the current implementation but may be less efficient for large-scale surface construction. Second, the method prices derivatives on a Heston-implied VIX proxy, not on the official Cboe VIX index. Third, the one-factor CIR variance process may not be flexible enough to reproduce real VIX futures and options data after calibration.
+
+These limitations define the natural direction for future work. Possible extensions include closed-form or more efficient payoff coefficient computation, adaptive truncation rules, exact CIR sampling for validation, and multi-factor or rough-volatility specifications for better market fit.
