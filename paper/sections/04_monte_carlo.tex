@@ -1,6 +1,8 @@
 \section{Monte Carlo Framework for Realised Variance and VIX Pricing}
 \label{sec:monte_carlo}
 
+Monte Carlo simulation is widely used in computational finance because it can approximate risk-neutral expectations even when the payoff is analytically inconvenient or path-dependent \citep{hirsa2024}.
+
 This section describes the Monte Carlo component of the project. The purpose of this part is to simulate the Heston stochastic volatility model, estimate realised variance, compare the simulation output with the analytical variance swap strike, and price a VIX call option under the affine Heston proxy. Monte Carlo simulation remains a standard numerical tool in computational finance because it can approximate risk-neutral expectations even when the payoff is path-dependent or analytically inconvenient \citep{hirsa2024}. In the present project, it is used as the first pricing engine and later as a benchmark for the Fourier-cosine method developed in Section~\ref{sec:cos_pricing}.
 
 \subsection{Risk-Neutral Heston Dynamics}
@@ -22,6 +24,8 @@ V_0 = e^{-rT}\mathbb{E}^{\mathbb{Q}}\left[\Phi\right].
 This relation is the basis for both the Monte Carlo estimator in this section and the semi-analytical pricing method in Section~\ref{sec:cos_pricing}.
 
 \subsection{Simulation Scheme}
+
+The simulation of square-root variance processes requires particular care near the zero boundary. Recent work on Heston and square-root process simulation highlights that discretisation choices can affect pricing accuracy, especially for variance-sensitive derivatives \citep{choikwok2024heston,abijaber2024squareroot}.
 
 The variance process is simulated by a full-truncation Euler scheme. For a time step $\Delta t$, the discretised variance update is
 \begin{equation}

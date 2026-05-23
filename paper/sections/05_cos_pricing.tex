@@ -1,6 +1,8 @@
 \section{CIR-Based COS Pricing of VIX Derivatives}
 \label{sec:cos_pricing}
 
+Fourier-based pricing methods are useful when the characteristic function is available even if the transition density is not directly used in closed form \citep{hirsa2024}. The COS method is particularly attractive because it approximates the pricing integral through a finite cosine expansion and can converge rapidly when the truncation interval is chosen appropriately \citep{junike2022cos,junike2024cos}.
+
 This section develops the Fourier-cosine pricing framework used for VIX derivatives. The purpose of this part is to provide a deterministic semi-analytical benchmark for the Monte Carlo prices obtained in Section~\ref{sec:monte_carlo}. Transform methods are widely used in computational finance because characteristic functions are often available even when the transition density is not available in closed form \citep{hirsa2024}. The COS method is particularly suitable in this setting because it approximates the pricing integral through a finite cosine expansion and can converge rapidly when the truncation interval is chosen appropriately \citep{junike2022cos,junike2024cos}.
 
 \subsection{Terminal CIR Distribution}
@@ -184,6 +186,8 @@ K
 \end{equation}
 
 \subsection{Truncation Interval}
+
+The truncation interval is a critical input in the COS method. If the interval is too narrow, relevant probability mass may be excluded; if it is too wide, the cosine approximation may become less efficient. For this reason, recent COS-method literature treats interval selection and the number of expansion terms as key accuracy controls \citep{junike2022cos,junike2024cos}.
 
 The COS method requires a finite interval $[a,b]$. Since the CIR variance process is non-negative, the lower bound is set to
 \begin{equation}
