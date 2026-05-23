@@ -1,0 +1,266 @@
+\section{Mathematical Framework}
+\label{sec:theory}
+
+This section presents the mathematical framework used in the project. The objective is to define the stochastic volatility model, derive the variance swap benchmark, construct the model-implied VIX proxy, and introduce the characteristic function of terminal CIR variance. These results provide the theoretical basis for the Monte Carlo engine in Section~\ref{sec:monte_carlo} and the COS pricing engine in Section~\ref{sec:cos_pricing}.
+
+\subsection{Risk-Neutral Pricing Principle}
+
+Derivative prices in this project are computed under the risk-neutral measure \(\mathbb{Q}\). If a derivative pays a terminal payoff \(\Phi\) at maturity \(T\), its time-zero price is given by
+\begin{equation}
+V_0
+=
+e^{-rT}
+\mathbb{E}^{\mathbb{Q}}
+\left[
+\Phi
+\right],
+\end{equation}
+where \(r\) is the continuously compounded risk-free rate. This representation is the common foundation for both simulation-based and transform-based pricing. Monte Carlo approximates the expectation by averaging simulated payoffs, while the COS method approximates the same expectation using the characteristic function of the state variable.
+
+In the present setting, the payoff may depend on realised variance, terminal variance, or a model-implied VIX level. The choice of state variable determines which numerical method is more convenient. Path-dependent quantities, such as realised variance, are naturally handled by Monte Carlo simulation. Payoffs depending on terminal variance are suitable for characteristic-function-based methods because terminal CIR variance has a known transform.
+
+\subsection{Heston Stochastic Volatility Model}
+
+The project uses the Heston stochastic volatility model as the baseline framework. Under the risk-neutral measure \(\mathbb{Q}\), the asset price \(S_t\) and instantaneous variance \(v_t\) satisfy
+\begin{align}
+\frac{dS_t}{S_t}
+&=
+r\,dt+\sqrt{v_t}\,dW_t^S, \label{eq:heston_stock}\\
+dv_t
+&=
+\kappa(\theta-v_t)\,dt+\sigma_v\sqrt{v_t}\,dW_t^v, \label{eq:heston_variance}\\
+d\langle W^S,W^v\rangle_t
+&=
+\rho\,dt. \label{eq:heston_corr}
+\end{align}
+Here, \(r\) is the risk-free rate, \(\kappa>0\) is the speed of mean reversion, \(\theta>0\) is the long-run variance level, \(\sigma_v>0\) is the volatility of variance, and \(\rho\in[-1,1]\) is the correlation between the stock and variance shocks.
+
+The variance process in \eqref{eq:heston_variance} is a Cox--Ingersoll--Ross process. Its drift term \(\kappa(\theta-v_t)\) pulls variance toward the long-run level \(\theta\). If \(v_t>\theta\), the drift is negative and variance tends to decrease. If \(v_t<\theta\), the drift is positive and variance tends to increase. This mean-reverting structure is important for the model-implied VIX term structure.
+
+The diffusion term \(\sigma_v\sqrt{v_t}\,dW_t^v\) makes the variance stochastic. The square-root specification ensures that the diffusion coefficient decreases as variance approaches zero. In continuous time, the process is non-negative under standard parameter conditions. In numerical simulation, however, discrete approximations may still produce small negative values, which motivates the use of full-truncation Euler simulation in the Monte Carlo engine.
+
+\subsection{Conditional Mean of the CIR Variance Process}
+
+A central quantity used throughout the project is the conditional expectation of future variance. Taking expectation in the CIR variance equation gives the ordinary differential equation
+\begin{equation}
+\frac{d}{dt}\mathbb{E}^{\mathbb{Q}}[v_t]
+=
+\kappa
+\left(
+\theta-\mathbb{E}^{\mathbb{Q}}[v_t]
+\right).
+\end{equation}
+Solving this equation with initial value \(v_0\) gives
+\begin{equation}
+\mathbb{E}^{\mathbb{Q}}[v_t]
+=
+\theta+(v_0-\theta)e^{-\kappa t}.
+\label{eq:cir_mean}
+\end{equation}
+More generally, conditional on information at time \(t\),
+\begin{equation}
+\mathbb{E}^{\mathbb{Q}}_t[v_{t+u}]
+=
+\theta+(v_t-\theta)e^{-\kappa u}.
+\label{eq:conditional_cir_mean}
+\end{equation}
+
+This formula is used twice in the project. First, it gives the analytical variance swap strike. Second, it gives the affine representation of the model-implied VIX proxy.
+
+\subsection{Variance Swap Strike}
+
+A variance swap is a contract whose payoff depends on realised variance over a fixed interval. In continuous time, the idealised floating leg is based on average integrated variance:
+\begin{equation}
+\frac{1}{T}\int_0^T v_s\,ds.
+\end{equation}
+The fair variance swap strike is therefore defined as the risk-neutral expectation of this quantity:
+\begin{equation}
+K_{\mathrm{var}}(0,T)
+=
+\frac{1}{T}
+\mathbb{E}^{\mathbb{Q}}
+\left[
+\int_0^T v_s\,ds
+\right].
+\label{eq:kvar_definition}
+\end{equation}
+
+Using Fubini's theorem and the conditional mean in \eqref{eq:cir_mean}, we obtain
+\begin{align}
+K_{\mathrm{var}}(0,T)
+&=
+\frac{1}{T}
+\int_0^T
+\mathbb{E}^{\mathbb{Q}}[v_s]\,ds \\
+&=
+\frac{1}{T}
+\int_0^T
+\left[
+\theta+(v_0-\theta)e^{-\kappa s}
+\right]ds.
+\end{align}
+Evaluating the integral yields
+\begin{equation}
+\boxed{
+K_{\mathrm{var}}(0,T)
+=
+\theta+
+(v_0-\theta)
+\frac{1-e^{-\kappa T}}{\kappa T}.
+}
+\label{eq:kvar_closed_form}
+\end{equation}
+
+This expression is important because it provides a closed-form benchmark. In the Monte Carlo part, the simulated realised variance is compared with \eqref{eq:kvar_closed_form}. If the simulation is implemented correctly and the number of paths is sufficiently large, the Monte Carlo mean should be close to the analytical strike.
+
+\subsection{Realised Variance and Its Discrete Approximation}
+
+In the numerical implementation, realised variance is computed from simulated stock prices observed on a finite time grid
+\[
+0=t_0<t_1<\cdots<t_m=T.
+\]
+The annualised realised variance estimator is
+\begin{equation}
+\widehat{\mathrm{RV}}_{0,T}^{(m)}
+=
+\frac{1}{T}
+\sum_{i=1}^{m}
+\left(
+\log\frac{S_{t_i}}{S_{t_{i-1}}}
+\right)^2.
+\label{eq:rv_discrete}
+\end{equation}
+This is the discrete analogue of quadratic variation. Under a continuous diffusion model, as the time mesh becomes finer, the sum of squared log returns approximates the integrated variance:
+\begin{equation}
+\widehat{\mathrm{RV}}_{0,T}^{(m)}
+\rightarrow
+\frac{1}{T}
+\int_0^T v_s\,ds.
+\label{eq:rv_limit}
+\end{equation}
+
+This connection justifies comparing simulated realised variance with the analytical variance swap strike. The realised variance estimator is path-based, while \(K_{\mathrm{var}}\) is expectation-based. Therefore, the comparison is performed after averaging realised variance across many Monte Carlo paths.
+
+\subsection{Model-Implied VIX Proxy}
+
+The official VIX index is constructed from SPX option prices, but the project uses a model-implied VIX proxy derived from expected future variance. For a fixed window \(\Delta\), the model-implied VIX at time \(T\) is defined by
+\begin{equation}
+\widetilde{\mathrm{VIX}}_T^2
+=
+100^2
+\frac{1}{\Delta}
+\mathbb{E}^{\mathbb{Q}}_T
+\left[
+\int_T^{T+\Delta}v_s\,ds
+\right].
+\label{eq:vix_proxy_definition}
+\end{equation}
+The factor \(100^2\) converts variance units into VIX index-point units.
+
+Using the conditional mean \eqref{eq:conditional_cir_mean}, we have
+\begin{align}
+\frac{1}{\Delta}
+\mathbb{E}^{\mathbb{Q}}_T
+\left[
+\int_T^{T+\Delta}v_s\,ds
+\right]
+&=
+\frac{1}{\Delta}
+\int_0^\Delta
+\mathbb{E}^{\mathbb{Q}}_T[v_{T+u}]\,du \\
+&=
+\frac{1}{\Delta}
+\int_0^\Delta
+\left[
+\theta+(v_T-\theta)e^{-\kappa u}
+\right]du.
+\end{align}
+Evaluating the integral gives
+\begin{equation}
+\frac{1}{\Delta}
+\mathbb{E}^{\mathbb{Q}}_T
+\left[
+\int_T^{T+\Delta}v_s\,ds
+\right]
+=
+\theta+(v_T-\theta)
+\frac{1-e^{-\kappa\Delta}}{\kappa\Delta}.
+\end{equation}
+Define
+\begin{align}
+B_\Delta
+&=
+\frac{1-e^{-\kappa\Delta}}{\kappa\Delta},
+\label{eq:b_delta}\\
+A_\Delta
+&=
+\theta(1-B_\Delta).
+\label{eq:a_delta}
+\end{align}
+Then the model-implied VIX proxy can be written as
+\begin{equation}
+\boxed{
+\widetilde{\mathrm{VIX}}_T
+=
+100\sqrt{A_\Delta+B_\Delta v_T}.
+}
+\label{eq:vix_affine}
+\end{equation}
+
+The relation in \eqref{eq:vix_affine} is central for both the Monte Carlo and COS pricing engines. In Monte Carlo, terminal variance is simulated path by path and then converted into VIX. In the COS method, the payoff becomes a deterministic function of terminal variance, which allows the terminal CIR characteristic function to be used.
+
+\subsection{Terminal CIR Distribution}
+
+For the COS pricing engine, the relevant state variable is terminal variance \(v_T\). The CIR process has a known terminal distribution:
+\begin{equation}
+v_T
+\sim
+c_T\chi_d^2(\lambda_T),
+\label{eq:cir_terminal_dist}
+\end{equation}
+where
+\begin{align}
+c_T
+&=
+\frac{\sigma_v^2(1-e^{-\kappa T})}{4\kappa},
+\label{eq:c_t}\\
+d
+&=
+\frac{4\kappa\theta}{\sigma_v^2},
+\label{eq:d_cir}\\
+\lambda_T
+&=
+\frac{4\kappa e^{-\kappa T}v_0}
+{\sigma_v^2(1-e^{-\kappa T})}.
+\label{eq:lambda_t}
+\end{align}
+Here, \(d\) is the degrees-of-freedom parameter and \(\lambda_T\) is the noncentrality parameter.
+
+The characteristic function of \(v_T\) is therefore
+\begin{equation}
+\boxed{
+\varphi_{v_T}(u)
+=
+(1-2iu c_T)^{-d/2}
+\exp\left(
+\frac{iu c_T\lambda_T}{1-2iu c_T}
+\right).
+}
+\label{eq:terminal_cir_cf}
+\end{equation}
+This is different from the transform of integrated variance. The distinction is important because the variance swap depends on \(\int_0^T v_s\,ds\), while the model-implied VIX payoff in this project depends on terminal variance \(v_T\) through \eqref{eq:vix_affine}.
+
+\subsection{Pricing Implications}
+
+The formulas above determine the roles of the two numerical engines. The Monte Carlo engine is used when path simulation is natural, particularly for realised variance. The COS engine is used when the payoff can be written as a function of terminal variance and the characteristic function is available.
+
+For a model-implied VIX call with strike \(K\), the payoff is
+\begin{equation}
+g_{\mathrm{call}}(v_T)
+=
+\left(
+100\sqrt{A_\Delta+B_\Delta v_T}-K
+\right)^+.
+\label{eq:vix_call_payoff}
+\end{equation}
+This payoff can be priced either by Monte Carlo simulation or by the COS method. The agreement between the two pricing approaches provides a consistency check for the implementation.
