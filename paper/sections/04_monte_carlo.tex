@@ -1,163 +1,212 @@
-\section{Monte Carlo Framework for Realised Variance and VIX Pricing}
+\section{Monte Carlo Framework}
 \label{sec:monte_carlo}
 
-Monte Carlo simulation is widely used in computational finance because it can approximate risk-neutral expectations even when the payoff is analytically inconvenient or path-dependent \citep{hirsa2024}.
+This section describes the Monte Carlo component of the project. The purpose of the W3 implementation is to simulate the Heston stochastic volatility model, estimate realised variance from simulated asset paths, validate the simulation against the analytical Heston variance swap strike, and price a model-implied VIX call option. Monte Carlo simulation is used because it provides a flexible numerical approximation of risk-neutral expectations and can be applied directly to path-dependent quantities such as realised variance \citep{hirsa2024}.
 
-This section describes the Monte Carlo component of the project. The purpose of this part is to simulate the Heston stochastic volatility model, estimate realised variance, compare the simulation output with the analytical variance swap strike, and price a VIX call option under the affine Heston proxy. Monte Carlo simulation remains a standard numerical tool in computational finance because it can approximate risk-neutral expectations even when the payoff is path-dependent or analytically inconvenient \citep{hirsa2024}. In the present project, it is used as the first pricing engine and later as a benchmark for the Fourier-cosine method developed in Section~\ref{sec:cos_pricing}.
+The Monte Carlo engine also serves as an independent benchmark for the Fourier-cosine pricing method developed in Section~\ref{sec:cos_pricing}. While the COS method is deterministic and based on the terminal variance characteristic function, Monte Carlo uses simulated paths and therefore contains sampling and discretisation error. Comparing the two methods under the same parameter set provides a useful internal validation check.
 
-\subsection{Risk-Neutral Heston Dynamics}
+\subsection{Simulation Objective}
 
-Under the risk-neutral measure $\mathbb{Q}$, the Heston model is written as
-\begin{align}
-\frac{dS_t}{S_t} &= rdt + \sqrt{v_t}\,dW_t^S, \\
-dv_t &= \kappa(\theta-v_t)dt + \sigma_v\sqrt{v_t}\,dW_t^v, \\
-d\langle W^S,W^v\rangle_t &= \rho\,dt.
-\end{align}
-Here, $S_t$ denotes the underlying asset price and $v_t$ denotes the instantaneous variance. The parameter $r$ represents the risk-free rate, while $\kappa$, $\theta$, and $\sigma_v$ describe the mean-reversion speed, long-run variance, and volatility of variance. The parameter $\rho$ controls the instantaneous correlation between the asset and variance Brownian motions.
+The Monte Carlo implementation has three main objectives. First, it generates joint paths of the asset price \(S_t\) and variance \(v_t\) under the risk-neutral Heston dynamics. Second, it computes realised variance from simulated log returns and compares the average realised variance with the analytical variance swap strike. Third, it prices a model-implied VIX call option by transforming terminal variance into a VIX proxy and averaging discounted payoffs.
 
-The square-root variance process is attractive because it preserves non-negativity in continuous time and introduces stochastic volatility in a parsimonious way. However, numerical simulation of square-root diffusions requires care near the zero boundary. Recent work on simulation schemes for Heston and related square-root processes emphasises that discretisation choices can materially affect pricing accuracy, especially for variance-sensitive derivatives \citep{choikwok2024heston,abijaber2024squareroot}.
-
-The model is implemented under $\mathbb{Q}$ because derivative prices are expressed as discounted conditional expectations. For a payoff $\Phi$ paid at maturity $T$, the pricing relation is
+The simulation is performed under the risk-neutral measure \(\mathbb{Q}\), because derivative prices are represented as discounted risk-neutral expectations. For a terminal payoff \(\Phi\), the general pricing relation is
 \begin{equation}
-V_0 = e^{-rT}\mathbb{E}^{\mathbb{Q}}\left[\Phi\right].
+V_0
+=
+e^{-rT}
+\mathbb{E}^{\mathbb{Q}}[\Phi].
 \end{equation}
-This relation is the basis for both the Monte Carlo estimator in this section and the semi-analytical pricing method in Section~\ref{sec:cos_pricing}.
+Monte Carlo approximates this expectation by simulating \(N\) independent paths and computing the sample average:
+\begin{equation}
+V_0^{MC}
+=
+e^{-rT}
+\frac{1}{N}
+\sum_{j=1}^{N}
+\Phi^{(j)}.
+\end{equation}
 
-\subsection{Simulation Scheme}
+\subsection{Heston Path Simulation}
 
-The simulation of square-root variance processes requires particular care near the zero boundary. Recent work on Heston and square-root process simulation highlights that discretisation choices can affect pricing accuracy, especially for variance-sensitive derivatives \citep{choikwok2024heston,abijaber2024squareroot}.
+The simulated model is the risk-neutral Heston system:
+\begin{align}
+\frac{dS_t}{S_t}
+&=
+r\,dt+\sqrt{v_t}\,dW_t^S,\\
+dv_t
+&=
+\kappa(\theta-v_t)\,dt+\sigma_v\sqrt{v_t}\,dW_t^v,\\
+d\langle W^S,W^v\rangle_t
+&=
+\rho\,dt.
+\end{align}
+The correlation between the Brownian motions is implemented by generating two independent standard normal variables \(Z_v\) and \(Z_\perp\), and then defining
+\begin{equation}
+Z_S
+=
+\rho Z_v+\sqrt{1-\rho^2}\,Z_\perp.
+\end{equation}
+This construction ensures that
+\begin{equation}
+\operatorname{Corr}(Z_S,Z_v)=\rho.
+\end{equation}
 
-The variance process is simulated by a full-truncation Euler scheme. For a time step $\Delta t$, the discretised variance update is
+The time interval \([0,T]\) is divided into \(m\) equal steps of length
+\begin{equation}
+\Delta t=\frac{T}{m}.
+\end{equation}
+The simulation stores both the stock paths and the variance paths. The stock paths are used to compute realised variance, while the terminal variance values are used for model-implied VIX pricing.
+
+\subsection{Full-Truncation Euler Scheme}
+
+The variance process contains the square-root term \(\sqrt{v_t}\). In continuous time, the CIR process is non-negative under standard conditions. However, in discrete-time numerical simulation, a simple Euler update may produce negative variance values. Since \(\sqrt{v_t}\) is not defined for negative \(v_t\), a stability correction is required.
+
+The implementation uses a full-truncation Euler scheme. Define
+\begin{equation}
+v_t^+
+=
+\max(v_t,0).
+\end{equation}
+The variance update is
 \begin{equation}
 v_{t+\Delta t}
 =
-v_t+\kappa(\theta-v_t^+)\Delta t
+v_t
 +
-\sigma_v\sqrt{v_t^+}\sqrt{\Delta t}\,Z_v,
+\kappa(\theta-v_t^+)\Delta t
++
+\sigma_v\sqrt{v_t^+}\sqrt{\Delta t}\,Z_v.
+\label{eq:mc_variance_update}
 \end{equation}
-where
+After the update, the next variance value is floored at zero:
 \begin{equation}
-v_t^+ = \max(v_t,0).
+v_{t+\Delta t}
+\leftarrow
+\max(v_{t+\Delta t},0).
 \end{equation}
-The truncation is introduced to preserve the square-root structure of the variance process at the numerical level. The full-truncation scheme is used as a practical compromise between numerical stability and implementation simplicity. It avoids taking the square root of negative simulated variance values while keeping the structure close to the original CIR dynamics. This choice is consistent with general simulation practice for stochastic volatility models discussed in modern computational finance references \citep{hirsa2024}.
 
-The asset process is simulated in logarithmic form:
+The stock price is simulated in logarithmic form:
 \begin{equation}
 \log S_{t+\Delta t}
 =
 \log S_t
 +
-\left(r-q-\frac{1}{2}v_t^+\right)\Delta t
+\left(r-\frac{1}{2}v_t^+\right)\Delta t
 +
 \sqrt{v_t^+}\sqrt{\Delta t}\,Z_S.
+\label{eq:mc_stock_update}
 \end{equation}
-The random variables $Z_S$ and $Z_v$ are standard normal variables satisfying
-\begin{equation}
-\mathrm{Corr}(Z_S,Z_v)=\rho.
-\end{equation}
-The log-price formulation is used because it keeps the simulated asset price positive and is consistent with the continuous-time dynamics of $\log S_t$.
+The log update preserves positivity of the simulated stock price and is consistent with the diffusion form of the asset dynamics.
+
+The simulation of square-root processes requires careful treatment near the zero boundary. Recent work on Heston and related square-root processes emphasises that discretisation choices can materially affect pricing accuracy, especially for variance-sensitive products \citep{choikwok2024heston,abijaber2024squareroot}. The full-truncation scheme is therefore used as a practical balance between numerical stability and implementation simplicity.
 
 \subsection{Realised Variance Estimation}
 
-For a simulated path observed on the grid
+After simulating stock paths, realised variance is computed from discrete log returns. For a path observed at time points
 \[
 0=t_0<t_1<\cdots<t_m=T,
 \]
-the annualised realised variance is computed as
+the realised variance estimator is
 \begin{equation}
-\widehat{RV}_{0,T}^{(m)}
+\widehat{\mathrm{RV}}_{0,T}^{(j)}
 =
 \frac{1}{T}
 \sum_{i=1}^{m}
 \left(
-\log\frac{S_{t_i}}{S_{t_{i-1}}}
-\right)^2.
+\log\frac{S_{t_i}^{(j)}}{S_{t_{i-1}}^{(j)}}
+\right)^2,
+\label{eq:mc_realised_variance}
 \end{equation}
-As the mesh of the time grid becomes smaller, the realised variance estimator approximates the time-averaged integrated variance:
+where \(j\) indexes the simulated path.
+
+The Monte Carlo estimate of expected realised variance is the sample mean:
 \begin{equation}
-\widehat{RV}_{0,T}^{(m)}
-\rightarrow
-\frac{1}{T}\int_0^T v_s\,ds.
+\overline{\mathrm{RV}}_{0,T}^{MC}
+=
+\frac{1}{N}
+\sum_{j=1}^{N}
+\widehat{\mathrm{RV}}_{0,T}^{(j)}.
+\end{equation}
+As the time discretisation becomes finer, realised variance approximates average integrated variance:
+\begin{equation}
+\widehat{\mathrm{RV}}_{0,T}^{(j)}
+\approx
+\frac{1}{T}
+\int_0^T v_s^{(j)}\,ds.
+\end{equation}
+Therefore, the Monte Carlo mean should approximate the analytical variance swap strike:
+\begin{equation}
+\overline{\mathrm{RV}}_{0,T}^{MC}
+\approx
+K_{\mathrm{var}}(0,T).
 \end{equation}
 
-The corresponding analytical fair variance swap strike is
+This comparison is the first validation test for the simulation engine. If the Monte Carlo mean realised variance is close to the analytical strike, the simulated variance dynamics are consistent with the theoretical expectation of integrated variance.
+
+\subsection{Variance Swap Benchmark}
+
+The analytical Heston variance swap strike is
 \begin{equation}
 K_{\mathrm{var}}(0,T)
 =
-\frac{1}{T}
-\mathbb{E}^{\mathbb{Q}}
-\left[
-\int_0^T v_s\,ds
-\right].
-\end{equation}
-Since the conditional expectation of the CIR variance process is
-\begin{equation}
-\mathbb{E}^{\mathbb{Q}}[v_t]
-=
-\theta+(v_0-\theta)e^{-\kappa t},
-\end{equation}
-the fair variance swap strike is
-\begin{equation}
-\boxed{
-K_{\mathrm{var}}(0,T)
-=
-\theta
-+
+\theta+
 (v_0-\theta)
 \frac{1-e^{-\kappa T}}{\kappa T}.
-}
 \end{equation}
-
-This expression is used as the main benchmark for the Monte Carlo realised variance estimate. A close match between the simulated mean realised variance and $K_{\mathrm{var}}(0,T)$ indicates that the simulation engine is consistent with the theoretical first moment of the Heston variance process.
-
-\subsection{Model-Implied VIX Proxy}
-
-The Heston model does not reproduce the official Cboe VIX construction directly. Instead, this project uses a model-implied affine VIX proxy defined by the expected future variance over a fixed window $\Delta$:
+The Monte Carlo engine compares this value with the mean realised variance. The error can be reported as an absolute error,
 \begin{equation}
-\widetilde{\mathrm{VIX}}_T^2
+\mathrm{AbsError}_{RV}
 =
-100^2
-\frac{1}{\Delta}
-\mathbb{E}^{\mathbb{Q}}_T
-\left[
-\int_T^{T+\Delta}v_s\,ds
-\right].
+\left|
+\overline{\mathrm{RV}}_{0,T}^{MC}
+-
+K_{\mathrm{var}}(0,T)
+\right|,
 \end{equation}
-Using the conditional expectation of the variance process,
+or as a relative error,
 \begin{equation}
-\mathbb{E}^{\mathbb{Q}}_T[v_{T+u}]
+\mathrm{RelError}_{RV}
 =
-\theta+(v_T-\theta)e^{-\kappa u},
+\frac{
+\left|
+\overline{\mathrm{RV}}_{0,T}^{MC}
+-
+K_{\mathrm{var}}(0,T)
+\right|
+}{
+K_{\mathrm{var}}(0,T)
+}.
 \end{equation}
-we obtain
+
+This benchmark is useful because it checks the numerical implementation against a closed-form theoretical quantity. It does not require market data and can therefore be performed before calibration.
+
+\subsection{Model-Implied VIX Call Pricing}
+
+The second pricing task in the Monte Carlo engine is a model-implied VIX call. The project uses the Heston-implied VIX proxy
 \begin{equation}
-\widetilde{\mathrm{VIX}}_T^2
+\widetilde{\mathrm{VIX}}_T
 =
-100^2(A_\Delta+B_\Delta v_T),
+100\sqrt{A_\Delta+B_\Delta v_T}.
 \end{equation}
-where
-\begin{align}
-B_\Delta &= \frac{1-e^{-\kappa\Delta}}{\kappa\Delta},\\
-A_\Delta &= \theta(1-B_\Delta).
-\end{align}
-
-The notation $\widetilde{\mathrm{VIX}}$ is used to emphasise that this is a model-implied VIX proxy rather than the official VIX index. This distinction is important because the official Cboe VIX methodology constructs the index from a strip of out-of-the-money SPX option prices, whereas the proxy above follows from the conditional expectation of future variance inside the Heston model \citep{cboe2024vix}. Therefore, the object priced in this section should be interpreted as a Heston-implied VIX derivative rather than a full replication of the exchange methodology.
-
-\subsection{Monte Carlo VIX Call Pricing}
-
-Given the affine VIX proxy, the payoff of a VIX call option with strike $K$ and maturity $T$ is
+For each simulated path \(j\), terminal variance \(v_T^{(j)}\) is transformed into terminal model-implied VIX:
 \begin{equation}
-\Phi(v_T)
+\widetilde{\mathrm{VIX}}_T^{(j)}
+=
+100\sqrt{A_\Delta+B_\Delta v_T^{(j)}}.
+\end{equation}
+The call payoff is
+\begin{equation}
+\Phi^{(j)}
 =
 \left(
-100\sqrt{A_\Delta+B_\Delta v_T}
+\widetilde{\mathrm{VIX}}_T^{(j)}
 -
 K
 \right)^+.
 \end{equation}
-The Monte Carlo estimator is therefore
+The Monte Carlo call price is then
 \begin{equation}
-C^{MC}_0(K,T)
+C_0^{MC}(K,T)
 =
 e^{-rT}
 \frac{1}{N}
@@ -166,24 +215,77 @@ e^{-rT}
 100\sqrt{A_\Delta+B_\Delta v_T^{(j)}}
 -
 K
-\right)^+,
+\right)^+.
+\label{eq:mc_vix_call}
 \end{equation}
-where $N$ is the number of simulated paths and $v_T^{(j)}$ is the terminal variance on path $j$.
 
-The uncertainty of the Monte Carlo estimator is measured by the standard error
-\begin{equation}
-SE(C^{MC}_0)
+This pricing method is straightforward because it only requires terminal variance values. However, since the terminal variance values come from discretised Heston paths, the result may contain both sampling error and time-discretisation bias.
+
+\subsection{Monte Carlo Confidence Interval}
+
+The uncertainty of the Monte Carlo estimate is measured by the standard error. Let
+\[
+Y_j
 =
 e^{-rT}
-\frac{s_\Phi}{\sqrt{N}},
-\end{equation}
-where $s_\Phi$ is the sample standard deviation of the simulated payoffs. The corresponding $95\%$ confidence interval is approximated by
+\left(
+100\sqrt{A_\Delta+B_\Delta v_T^{(j)}}
+-
+K
+\right)^+
+\]
+be the discounted payoff on path \(j\). The Monte Carlo price is
 \begin{equation}
-C^{MC}_0 \pm 1.96\,SE(C^{MC}_0).
+C_0^{MC}
+=
+\frac{1}{N}
+\sum_{j=1}^{N}Y_j.
+\end{equation}
+The sample standard deviation is
+\begin{equation}
+s_Y
+=
+\sqrt{
+\frac{1}{N-1}
+\sum_{j=1}^{N}
+\left(
+Y_j-C_0^{MC}
+\right)^2
+}.
+\end{equation}
+The standard error is
+\begin{equation}
+SE(C_0^{MC})
+=
+\frac{s_Y}{\sqrt{N}}.
+\end{equation}
+An approximate \(95\%\) confidence interval is
+\begin{equation}
+C_0^{MC}
+\pm
+1.96\,SE(C_0^{MC}).
 \end{equation}
 
-\subsection{Numerical Validation}
+This interval helps interpret the difference between Monte Carlo and COS prices. A small difference between the two methods is meaningful only when the Monte Carlo uncertainty is sufficiently controlled.
 
-The Monte Carlo engine is validated through two checks. First, the mean realised variance from simulated paths is compared with the analytical variance swap strike. Second, the Monte Carlo VIX call price is compared with the COS price obtained in Section~\ref{sec:cos_pricing}. The comparison is meaningful only if the Monte Carlo confidence interval is sufficiently narrow and the estimate remains stable when the number of paths and time steps is increased.
+\subsection{Convergence Behaviour}
 
-The main sources of numerical error are sampling error and time-discretisation bias. Sampling error decreases at the rate $O(N^{-1/2})$, while time-discretisation bias is controlled by refining the simulation grid. For this reason, the numerical results should report not only the estimated price but also the number of paths, the number of time steps, and the confidence interval.
+Monte Carlo convergence is governed by the central limit theorem. The sampling error decreases at the rate
+\begin{equation}
+O(N^{-1/2}),
+\end{equation}
+where \(N\) is the number of simulated paths. This rate is independent of the dimension of the simulated process, which is one reason Monte Carlo is widely used in finance. However, the convergence is relatively slow: reducing the standard error by a factor of two requires approximately four times as many paths.
+
+The implementation therefore studies price stability across different path counts. In addition to increasing \(N\), time-discretisation error can be reduced by increasing the number of time steps \(m\). In practice, both sources of error must be considered. A large number of paths does not eliminate bias caused by a coarse time grid.
+
+\subsection{Interpretation of W3 Results}
+
+The W3 component provides a flexible simulation-based pricing framework. Its first validation step is the comparison between simulated realised variance and the analytical variance swap strike. Its second output is a Monte Carlo price for a model-implied VIX call. These two tasks show that the engine can be used both for path-based quantities and terminal-payoff derivatives.
+
+The Monte Carlo engine is not intended to be the fastest pricing method in the project. Instead, its role is to provide a transparent and flexible benchmark. It is especially useful because the simulated paths can later be reused for additional tasks such as scenario analysis, preliminary variance-risk comparisons, and empirical extensions once market data are added.
+
+\subsection{Limitations of the Monte Carlo Engine}
+
+The current Monte Carlo implementation has several limitations. First, it uses an Euler-type discretisation rather than exact simulation of the CIR process. This is practical and stable, but it may introduce discretisation bias. Second, the current implementation uses synthetic parameters rather than calibrated market parameters. Third, the VIX quantity priced in the simulation is a Heston-implied proxy rather than the official Cboe VIX index.
+
+These limitations do not invalidate the W3 implementation. Rather, they define the scope of the current stage. The goal of W3 is to build and validate a simulation engine under controlled model assumptions. Future stages can extend this engine by adding market calibration, exact CIR sampling, variance risk premium backtesting, and real-data validation.
