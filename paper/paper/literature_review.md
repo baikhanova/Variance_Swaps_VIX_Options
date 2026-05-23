@@ -38,6 +38,25 @@ Understanding the log-contract argument is therefore a necessary step before der
 
 The replication result of Demeterfi et al. serves as a foundation for three workstreams directly. First, W2 (Theory Lead) uses the log-contract argument to derive Equation (3) from first principles, as required by the Week 4 deliverables. Second, W3 (MC Engineer) compares the Monte Carlo estimate of $\mathbb{E}^{\mathbb{Q}}[\text{RV}_{0,T}]$ with the closed-form solution for $K_{\text{var}}$. This comparison is only meaningful if one understands what the formula represents. Third, and most importantly, W8 (Risk Lead) depends on the model-free nature of the replication to construct a Vega hedge for the variance swap that does not rely on Heston parameters. The model-independence of the hedge is not simply a technical convenience but a fundamental economic point that originates in this paper.
 
+### 2.5 Critical Assessment of Demeterfi et al. (1999)
+
+While the replication framework of Demeterfi et al. (1999) remains one of the most influential contributions in volatility derivatives, it relies on several strong assumptions.
+
+Strengths:
+Provides a model-free valuation framework for variance swaps.
+Establishes a direct connection between option prices and future variance.
+Forms the theoretical foundation of the modern VIX methodology.
+Does not require specification of the underlying asset dynamics.
+
+Limitations:
+Requires a continuum of strikes, which does not exist in real markets.
+Assumes sufficient market liquidity across the entire strike range.
+The replication becomes approximate when option quotes are sparse.
+The original framework assumes continuous sample paths and does not explicitly account for jumps.
+The replication becomes approximate when option quotes are sparse, leading to truncation and discretization errors near extreme strikes.
+
+These limitations motivate later research on stochastic volatility, jump-diffusion models, and alternative variance replication techniques.
+
 ---
 
 ## 3. Carr and Wu (2009): The Variance Risk Premium
@@ -72,6 +91,24 @@ Carr and Wu's finding that a significant alpha remains after controlling for equ
 
 The methodology of Carr and Wu (2009) is the direct template for W5 (Data Scientist), who reconstructs the monthly VRP time series using both ex-post and GARCH-based ex-ante estimates. The strategy logic of W8, including sizing, backtesting, crisis analysis, and factor decomposition, follows the empirical framework of this paper. The Sharpe ratio decomposition by VRP regime (high VRP vs. low VRP) is grounded in Carr and Wu's insight that the premium varies greatly across market states.
 
+### 3.6 Critical Assessment of Carr and Wu (2009)
+
+Carr and Wu provide compelling evidence that the variance risk premium exists across equity markets. Their empirical framework has become the benchmark methodology for volatility risk premium studies.
+
+Strengths:
+Clear separation of risk-neutral and physical variance expectations.
+Robust empirical evidence across multiple datasets.
+Strong economic interpretation of variance as an insurance product.
+Direct applicability to trading strategies.
+
+Limitations:
+Results depend on the quality of realised variance estimation.
+Forecasting models such as GARCH introduce model risk.
+Variance risk premium estimates may vary across volatility regimes.
+Extreme market events can distort short-sample estimates.
+
+Subsequent research therefore focuses on more robust realised-volatility estimators and regime-dependent modelling approaches.
+
 ---
 
 ## 4. Bergomi (2005): Forward Variance Models and the Failure of One-Factor Specifications
@@ -102,6 +139,22 @@ This framework decouples the instantaneous variance dynamics from the shape of t
 
 Bergomi (2005) provides the theoretical motivation for the joint calibration exercise in W6. Steps 1–4 of Section 6.1 in the project specification are a direct operationalisation of the argument: calibrate Heston to SPX options (Step 1), compute the implied VIX futures curve (Step 2), observe the discrepancy (Step 3), and conclude that a two-factor or rough volatility model is necessary (Step 4). An additional extension of the project involves implementing a two-factor CIR model $v_t = v^{(1)}_t + v^{(2)}_t$ - is explicitly motivated by the multi-factor framework that Bergomi advocates.
 
+### 4.5 Critical Assessment of Bergomi (2005)
+
+Bergomi's forward variance framework fundamentally changed the way practitioners view volatility modelling.
+
+Strengths:
+Explains the failure of one-factor stochastic-volatility models.
+Provides a flexible framework for modelling the entire forward variance curve.
+Forms the basis of modern rough-volatility models.
+Successfully captures the term structure of volatility skews, correcting the fast $O(1/T)$ decay inherent in standard Markovian models.
+
+Limitations:
+Infinite-dimensional state variables increase computational complexity.
+Calibration is considerably more demanding than classical Heston models.
+Practical implementation often requires approximations and dimensional reduction.
+
+These challenges continue to motivate research into efficient calibration techniques and machine-learning-based approximations.
 ---
 
 ## 5. Gatheral (2006): The Volatility Surface — VIX Chapters
@@ -133,6 +186,23 @@ Gatheral's treatment of the VIX smile provides the analytical basis for W7 (Vol 
 ### 5.5 Role in the Present Project
 
 Gatheral (2006) serves as the primary analytical reference for W2, W4, and W7. W2 uses the book to prove that $\text{VIX}_t^2$ is affine in $v_t$ and to derive the CIR characteristic function (Week 4 deliverables 3 and 4). W4 implements the COS pricing engine using the characteristic function as input. W7 constructs the vol-of-vol surface and provides the economic explanation for the shape of the VIX smile. This explanation is described most clearly in Gatheral's framework.
+
+### 5.6 Critical Assessment of Gatheral (2006)
+
+Gatheral's treatment of volatility surfaces remains one of the most widely used references in quantitative finance.
+
+Strengths:
+Provides rigorous analytical derivations.
+Establishes the affine relationship between VIX and variance under Heston dynamics.
+Offers practical intuition regarding volatility smiles and skews.
+Bridges theory and market practice effectively.
+
+Limitations:
+Focuses primarily on Markovian stochastic-volatility models.
+Does not address rough volatility developments that emerged later.
+Joint SPX–VIX calibration remains problematic within the one-factor framework.
+
+These limitations partly explain the emergence of rough-volatility and path-dependent volatility models reviewed in the contemporary literature.
 
 ---
 
@@ -353,6 +423,46 @@ For the project, the natural empirical workflow is:
 The classical literature establishes the project foundation: Demeterfi et al. explain why variance can be replicated from options; Carr and Wu turn the difference between implied and realised variance into an empirical risk premium; Bergomi shows why forward variance is the natural state variable for volatility derivatives; and Gatheral provides the analytical Heston and VIX machinery.
 
 The contemporary literature explains why these foundations are not enough. Rough volatility improves the description of short-maturity skew and volatility path regularity. Joint SPX--VIX calibration results show that one-factor models are too restrictive for VIX options. Realised kernels solve the empirical problem that naive high-frequency realised variance is biased by market microstructure noise. Together, these frontier topics connect modern rough-volatility models and robust realised-variance estimation to the pricing and empirical analysis of variance swaps and VIX options.
+
+---
+
+### 11. Research Frontier and Open Problems
+
+Despite significant advances in volatility modelling, several important challenges remain unresolved.
+
+### 11.1 Joint SPX–VIX Calibration
+
+One of the most persistent problems in volatility modelling is the simultaneous calibration of SPX options, VIX futures, and VIX options. Classical one-factor models often fit one market at the expense of another. Although rough volatility and multi-factor models improve performance, a universally accepted solution has not yet emerged.
+
+### 11.2 Computational Complexity of Rough Volatility
+
+Rough volatility models achieve excellent empirical performance but are computationally expensive. Real-time calibration remains difficult in practical trading environments. Deep-learning-based calibration methods provide promising results, but questions regarding stability, interpretability, and generalisation remain open.
+
+### 11.3 Volatility Forecasting Under Regime Changes
+
+Variance risk premium strategies often perform differently during crisis and non-crisis periods. Identifying volatility regimes and adapting model parameters dynamically remains an active area of research.
+
+### 11.4 Robust Measurement of Realised Variance
+
+Although realised kernels reduce microstructure-noise bias, no estimator is universally optimal across all market conditions. Improving high-frequency volatility estimation continues to be an important empirical challenge.
+
+### 11.5 Future Research Directions
+
+Future studies may combine rough volatility, machine learning, and path-dependent dynamics into unified frameworks capable of jointly explaining option prices, volatility derivatives, and realised variance behaviour. Such models could potentially overcome many of the limitations identified in the current literature.
+
+---
+
+### 12. Literature Gap and Contribution of the Present Project
+
+The literature reviewed above reveals three important gaps.
+
+First, classical stochastic-volatility models provide analytical tractability but often fail to reproduce observed SPX and VIX dynamics simultaneously.
+
+Second, modern rough-volatility models improve empirical fit but introduce substantial computational complexity.
+
+Third, empirical measurements of the variance risk premium remain sensitive to the methodology used to estimate realised variance.
+
+The present project contributes to this literature by combining theoretical variance-swap valuation, stochastic-volatility modelling, numerical pricing techniques, and empirical volatility-risk-premium analysis within a unified framework. Specifically, the project compares Monte Carlo and COS pricing methods, evaluates variance-swap valuation under stochastic variance dynamics, and investigates the behaviour of volatility risk premia across different market regimes.
 
 ---
 
