@@ -1,0 +1,227 @@
+\section{Results and Discussion}
+\label{sec:results_discussion}
+
+This section discusses the numerical results obtained from the Monte Carlo and COS pricing engines. The results are based on synthetic model parameters rather than market-calibrated parameters. Therefore, they should be interpreted as internal consistency checks of the numerical framework, not as empirical claims about observed market prices.
+
+The main purpose of the results section is to verify whether the two independently implemented pricing approaches produce consistent outputs under the same model assumptions. The Monte Carlo engine simulates Heston paths and estimates payoffs by averaging discounted simulated values. The COS engine uses the characteristic function of terminal CIR variance and evaluates the same model-implied VIX payoff through a Fourier-cosine expansion. Agreement between these methods supports the correctness of the numerical implementation.
+
+\subsection{Benchmark Parameter Set}
+
+The comparison between Monte Carlo and COS pricing is performed under the following parameter set:
+\begin{equation}
+v_0=0.04,\qquad
+\kappa=2,\qquad
+\theta=0.04,\qquad
+\sigma_v=0.5,
+\end{equation}
+with option maturity
+\begin{equation}
+T=\frac{30}{365},
+\end{equation}
+risk-free rate
+\begin{equation}
+r=0.03,
+\end{equation}
+and VIX option strike
+\begin{equation}
+K=20.
+\end{equation}
+
+The values \(v_0=0.04\) and \(\theta=0.04\) imply that the initial variance is equal to the long-run variance. In volatility-point terms, this corresponds approximately to a long-run volatility level of \(20\%\), because \(\sqrt{0.04}=0.20\). This parameter setting is useful for benchmark testing because the model starts near its long-run variance level and does not impose a strong upward or downward mean-reversion effect at the initial time.
+
+\subsection{Monte Carlo Validation through Realised Variance}
+
+The first validation step in W3 is the comparison between simulated realised variance and the analytical Heston variance swap strike. The realised variance is computed path by path as
+\begin{equation}
+\widehat{\mathrm{RV}}_{0,T}^{(j)}
+=
+\frac{1}{T}
+\sum_{i=1}^{m}
+\left(
+\log\frac{S_{t_i}^{(j)}}{S_{t_{i-1}}^{(j)}}
+\right)^2.
+\end{equation}
+The analytical benchmark is
+\begin{equation}
+K_{\mathrm{var}}(0,T)
+=
+\theta+
+(v_0-\theta)
+\frac{1-e^{-\kappa T}}{\kappa T}.
+\end{equation}
+
+When the average Monte Carlo realised variance is close to \(K_{\mathrm{var}}(0,T)\), the simulation is consistent with the theoretical expectation of integrated variance. This is an important test because realised variance is computed from simulated stock paths, whereas the analytical strike is derived from the variance process. Agreement between the two confirms that the joint simulation of stock and variance paths behaves consistently with the model.
+
+This test is also useful because it does not require market data. Before calibrating the model to real prices, the implementation can be checked against a known theoretical quantity. In this sense, the variance swap comparison functions as a unit-level validation of the Monte Carlo engine.
+
+\subsection{Monte Carlo VIX Call Price}
+
+The Monte Carlo VIX call price is obtained by transforming terminal variance into the model-implied VIX proxy:
+\begin{equation}
+\widetilde{\mathrm{VIX}}_T
+=
+100\sqrt{A_\Delta+B_\Delta v_T}.
+\end{equation}
+The discounted payoff is then averaged across simulated paths:
+\begin{equation}
+C_0^{MC}
+=
+e^{-rT}
+\frac{1}{N}
+\sum_{j=1}^{N}
+\left(
+100\sqrt{A_\Delta+B_\Delta v_T^{(j)}}-K
+\right)^+.
+\end{equation}
+
+Under the benchmark parameter set, the Monte Carlo estimate is
+\begin{equation}
+C_0^{MC}
+\approx
+1.984952.
+\end{equation}
+This value is simulation-based and therefore depends on the number of paths, the time discretisation, and the random seed. It is not expected to be exactly equal to the COS price. Instead, the Monte Carlo result should be interpreted together with its sampling uncertainty and convergence behaviour.
+
+\subsection{COS VIX Call Price}
+
+The COS method prices the same model-implied VIX call using the terminal CIR characteristic function. The payoff is still
+\begin{equation}
+g(v)
+=
+\left(
+100\sqrt{A_\Delta+B_\Delta v}-K
+\right)^+,
+\end{equation}
+but the expected payoff is computed through a Fourier-cosine expansion rather than through simulated paths.
+
+Under the same benchmark parameter set, the COS price is
+\begin{equation}
+C_0^{COS}
+\approx
+2.008969.
+\end{equation}
+Unlike Monte Carlo, this value is deterministic for a fixed number of COS terms, truncation interval, and integration grid used for payoff coefficients. Therefore, the COS result provides a useful semi-analytical benchmark for the simulation-based estimate.
+
+\subsection{Comparison between Monte Carlo and COS}
+
+The numerical comparison is summarised as follows:
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Quantity & Value & Interpretation \\
+\midrule
+COS price & 2.008969 & Characteristic-function-based estimate \\
+Monte Carlo price & 1.984952 & Simulation-based estimate \\
+Absolute difference & 0.024017 & Difference between the two engines \\
+Relative difference & 1.21\% & Difference relative to Monte Carlo price \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The absolute difference is
+\begin{equation}
+\mathrm{AbsError}
+=
+|C_0^{COS}-C_0^{MC}|
+=
+0.024017.
+\end{equation}
+The relative difference is
+\begin{equation}
+\mathrm{RelError}
+=
+\frac{|C_0^{COS}-C_0^{MC}|}{C_0^{MC}}
+\approx
+1.21\%.
+\end{equation}
+
+This result supports the numerical consistency of the two pricing engines. Exact equality is not expected because the two methods have different sources of numerical error. Monte Carlo contains sampling error and time-discretisation bias. The COS method contains truncation error, finite-series approximation error, and numerical integration error in the payoff coefficients. A relative difference of approximately \(1.21\%\) is therefore acceptable for an internal benchmark at this stage of the project.
+
+\subsection{Interpretation of the Pricing Difference}
+
+The observed difference between the COS and Monte Carlo prices should be interpreted carefully. A small difference does not prove that both implementations are mathematically perfect, but it provides evidence that the two methods are broadly aligned under the same assumptions.
+
+The Monte Carlo estimate is affected by random sampling. Increasing the number of paths should reduce the sampling component of the error at the rate \(O(N^{-1/2})\). However, increasing the number of paths alone does not remove time-discretisation bias. If the time grid is too coarse, the simulated variance and stock paths may still deviate from the continuous-time model.
+
+The COS estimate, by contrast, is not affected by random sampling. Its accuracy depends mainly on the number of cosine terms \(N\), the truncation interval \([a,b]\), and the numerical computation of payoff coefficients. If the truncation interval is too narrow, the method may exclude relevant probability mass. If the interval is too wide, the approximation may become less efficient.
+
+Therefore, the comparison between COS and Monte Carlo should be viewed as a cross-validation exercise. The two methods are based on different numerical principles. When they produce close results, confidence in the implementation increases.
+
+\subsection{COS Density Recovery}
+
+The COS engine also performs density recovery for terminal CIR variance. The recovered density is computed using the same characteristic function that is used for pricing:
+\begin{equation}
+\widehat{f}_{v_T}(v)
+=
+\sideset{}{'}\sum_{k=0}^{N-1}
+A_k
+\cos\left(
+\frac{k\pi(v-a)}{b-a}
+\right).
+\end{equation}
+A basic diagnostic check is whether the recovered density integrates approximately to one:
+\begin{equation}
+\int_a^b \widehat{f}_{v_T}(v)\,dv
+\approx
+1.
+\end{equation}
+
+This check is important because a pricing output can appear plausible even if the underlying density approximation is poor. Density recovery provides a more direct test of the characteristic function, the truncation interval, and the cosine expansion. If the recovered density fails to integrate close to one, then option prices based on the same expansion may not be reliable.
+
+\subsection{Convergence in the Number of COS Terms}
+
+The COS convergence study evaluates how the price changes as the number of expansion terms \(N\) increases. A stable COS implementation should show that prices become less sensitive to \(N\) after a sufficiently large number of terms. In the benchmark implementation, \(N=128\) is used as the reported setting.
+
+The number of terms should not be interpreted independently from the truncation interval. Increasing \(N\) improves the resolution of the cosine expansion within the chosen interval, but it does not fix an interval that excludes important probability mass. This is why the W4 validation framework studies both the number of terms and the truncation-width parameter.
+
+\subsection{Convergence in the Truncation Width}
+
+The truncation interval is set as
+\begin{equation}
+a=0,\qquad
+b=\mathbb{E}^{\mathbb{Q}}[v_T]+L\sqrt{\operatorname{Var}^{\mathbb{Q}}(v_T)}.
+\end{equation}
+The lower bound is zero because CIR variance is non-negative. The upper bound depends on the truncation-width parameter \(L\).
+
+The role of \(L\) is to include most of the relevant probability mass of terminal variance. If \(L\) is too small, tail values of \(v_T\) may be excluded. If \(L\) is too large, the cosine expansion is performed over an unnecessarily wide interval. The implementation uses \(L=8\) as a practical benchmark and studies sensitivity to alternative values.
+
+\subsection{Model-Implied VIX Term Structure}
+
+The W4 implementation also computes a model-implied VIX futures term structure:
+\begin{equation}
+F(0,T)
+=
+\mathbb{E}^{\mathbb{Q}}
+\left[
+100\sqrt{A_\Delta+B_\Delta v_T}
+\right].
+\end{equation}
+This quantity is a futures level, not a discounted derivative price. Therefore, no discount factor appears in the expression.
+
+The shape of the model-implied term structure follows from mean reversion in the CIR variance process. When \(v_0>\theta\), current variance is above its long-run mean, so expected future variance decreases with maturity. This produces a downward-sloping VIX futures curve, associated with backwardation. When \(v_0<\theta\), current variance is below its long-run mean, so expected future variance increases with maturity. This produces an upward-sloping curve, associated with contango.
+
+This result demonstrates that even a simple one-factor variance process can reproduce basic mean-reversion patterns in the VIX term structure. However, it does not imply that the one-factor model can fit real market VIX futures data accurately across all maturities. Market calibration is left for later stages.
+
+\subsection{Testing and Completeness}
+
+The implementation includes tests for several mathematical and numerical components. These include parameter validation, characteristic function boundary conditions, VIX affine mapping, terminal density recovery, non-negativity of option prices, VIX futures positivity, and convergence output structure.
+
+The purpose of these tests is not only to verify that functions run without errors. They also check mathematical properties that should hold regardless of the chosen parameter set. For example, the characteristic function should satisfy
+\begin{equation}
+\varphi(0)=1,
+\end{equation}
+and for real \(u\),
+\begin{equation}
+|\varphi(u)|\leq 1.
+\end{equation}
+Similarly, the recovered density should be non-negative after numerical correction and should integrate approximately to one.
+
+These checks help ensure that the implementation is mathematically consistent and not merely producing numerical outputs.
+
+\subsection{Overall Discussion}
+
+The W3 and W4 results show that the project has a working numerical core. The Monte Carlo engine provides a flexible simulation-based method for realised variance and VIX call pricing. The COS engine provides a faster deterministic method based on the terminal variance characteristic function. Their comparison gives a meaningful cross-validation framework.
+
+The current results should be interpreted within the scope of a model-based numerical project. They are not market-calibrated prices, and they do not yet constitute an empirical volatility risk premium study. Instead, they demonstrate that the theoretical formulas, code implementation, and numerical validation are aligned.
+
+This stage prepares the project for the next components: real data collection, model calibration, comparison with market prices, and volatility risk premium backtesting.
