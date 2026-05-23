@@ -1,3 +1,64 @@
-The Heston model is a central benchmark in stochastic volatility modelling because it introduces a mean-reverting square-root variance process while preserving a degree of analytical tractability. In this framework, the variance process follows a Cox--Ingersoll--Ross type dynamics. This makes it suitable for both Monte Carlo simulation and characteristic-function-based pricing \citep{hirsa2024}.
+\section{Literature Review}
+\label{sec:literature_review}
 
-Recent work also emphasises the importance of numerical accuracy in both simulation-based and transform-based pricing methods. In particular, recent studies on the COS method show that the truncation interval and the number of cosine terms are central numerical choices rather than secondary implementation details \citep{junike2022cos,junike2024cos}.
+The literature on volatility as an asset class can be organised around several connected themes: variance swap replication, stochastic volatility modelling, VIX derivatives, numerical pricing methods, and the empirical volatility risk premium. This section reviews these themes in relation to the current project.
+
+\subsection{Volatility Derivatives and Variance Swaps}
+
+Variance swaps are among the most direct instruments for trading volatility. Unlike a standard option, whose payoff depends on the terminal level of the underlying asset, a variance swap depends on realised variance over a specified time interval. The floating leg is determined by the realised variance of the underlying, while the fixed leg is set at inception. The fair variance strike is therefore the risk-neutral expectation of future realised variance.
+
+This relationship makes variance swaps useful for both theoretical and practical reasons. Theoretically, they provide a clean connection between quadratic variation and derivative pricing. Practically, they allow investors to trade future realised volatility without choosing a particular option strike. For this reason, variance swaps are often used as a benchmark instrument in volatility modelling.
+
+In the Heston framework, the fair variance swap strike can be obtained from the expected integrated variance. Since the variance process is mean-reverting, the fair strike depends on the initial variance, long-run variance, mean-reversion speed, and maturity. This gives a closed-form expression that is useful for validating Monte Carlo simulation.
+
+\subsection{Stochastic Volatility and the Heston Benchmark}
+
+The Black--Scholes model assumes constant volatility, which is not sufficient to describe observed option markets. Market implied volatility varies across strikes and maturities, producing volatility smiles and surfaces. Stochastic volatility models address this limitation by allowing volatility or variance to evolve randomly over time.
+
+The Heston model is one of the most important stochastic volatility benchmarks. It specifies a square-root process for variance and allows the asset price and variance shocks to be correlated. The variance process is mean-reverting, which is consistent with the empirical observation that periods of high volatility tend to be followed by gradual normalisation. The model also provides analytical and semi-analytical tools through characteristic functions, which makes it suitable for numerical pricing \citep{hirsa2024}.
+
+In the current project, the Heston model is used not because it is the most realistic model for all market conditions, but because it provides a tractable foundation for implementing and comparing numerical methods. It allows the project to derive a variance swap benchmark, simulate stochastic variance paths, construct a model-implied VIX proxy, and use the terminal CIR characteristic function in the COS method.
+
+\subsection{VIX Derivatives and Model-Implied VIX}
+
+The VIX index is widely interpreted as a market measure of expected future volatility. It is constructed from SPX option prices and is often referred to as a measure of market-implied volatility. VIX futures and VIX options are therefore important instruments for trading volatility expectations.
+
+However, the official VIX methodology and a model-implied VIX proxy are not the same object. The official Cboe methodology constructs the index from a strip of out-of-the-money options and uses a specific interpolation and aggregation procedure \citep{cboe2024vix}. A stochastic volatility model, by contrast, may define a VIX-type quantity as the conditional expectation of future variance over a fixed time window. This produces a mathematically convenient model-implied proxy.
+
+This distinction is important for the present project. The numerical implementation prices derivatives on
+\[
+\widetilde{\mathrm{VIX}}_T
+=
+100\sqrt{A+Bv_T},
+\]
+where \(v_T\) is terminal Heston variance and \(A,B\) are obtained from the conditional expectation of future CIR variance. This proxy captures the model's internal expectation of future variance, but it does not fully reproduce the market construction of the official VIX index.
+
+\subsection{Monte Carlo Methods in Computational Finance}
+
+Monte Carlo simulation is a standard method for derivative pricing when analytical solutions are unavailable or inconvenient. It approximates risk-neutral expectations by averaging simulated discounted payoffs. Its main advantage is flexibility: once a stochastic model is specified, one can simulate paths and compute many types of payoffs.
+
+In this project, Monte Carlo simulation is used for three purposes. First, it simulates Heston stock and variance paths. Second, it estimates realised variance from simulated log returns. Third, it prices a model-implied VIX call by transforming terminal variance into a VIX level and averaging the discounted payoff.
+
+The main limitation of Monte Carlo simulation is statistical error. The standard error decreases at the rate \(O(N^{-1/2})\), where \(N\) is the number of simulated paths. Therefore, high accuracy may require a large number of paths. In addition, discretisation error arises because continuous-time stochastic differential equations are approximated on a finite time grid.
+
+The simulation of square-root variance processes requires particular care near the zero boundary. Although the CIR process is non-negative in continuous time, discretisation schemes may produce small negative values. Modern discussions of Heston and square-root process simulation emphasise that numerical schemes can materially affect pricing accuracy, especially for variance-sensitive derivatives \citep{choikwok2024heston,abijaber2024squareroot}. For this reason, the project uses a full-truncation Euler scheme to preserve numerical stability.
+
+\subsection{Fourier and COS Pricing Methods}
+
+Transform-based pricing methods are widely used in quantitative finance because characteristic functions are often available even when probability densities are difficult to use directly. The Fourier-cosine method belongs to this family. It approximates the density or pricing integral on a finite interval by a cosine expansion and then computes option prices from characteristic function values.
+
+The COS method is particularly attractive for models with known characteristic functions, including affine stochastic volatility models. It can converge rapidly when the payoff is sufficiently regular and the truncation interval is chosen appropriately. However, the method is sensitive to numerical choices. If the truncation interval is too narrow, relevant probability mass may be excluded. If it is too wide, convergence may become less efficient. Recent work on the COS method treats both the truncation range and the number of expansion terms as central accuracy controls rather than minor implementation details \citep{junike2022cos,junike2024cos}.
+
+In the current project, the COS method is applied to terminal CIR variance. Since the model-implied VIX payoff is a function of terminal variance, the terminal CIR characteristic function can be used directly. The payoff coefficients are computed numerically because the VIX payoff contains a square-root transformation of variance. This implementation provides a deterministic benchmark for the Monte Carlo VIX call price.
+
+\subsection{Volatility Risk Premium and Future Extensions}
+
+The volatility risk premium refers to the difference between implied variance and expected realised variance under the physical measure. A positive premium means that market-implied variance exceeds expected future realised variance. This phenomenon is often interpreted as compensation demanded by investors for bearing volatility risk.
+
+The current project prepares the numerical foundation for studying the volatility risk premium, but does not yet perform a full empirical backtest. Such a backtest would require historical VIX, SPX option, VIX futures, and realised variance data. It would also require careful distinction between risk-neutral expectations and physical expectations. Therefore, volatility risk premium analysis is treated as a future extension after the data collection and calibration stages.
+
+\subsection{Summary of Literature Implications}
+
+The reviewed literature suggests three important implications for the project. First, volatility-linked derivatives require models that treat variance as a dynamic state variable rather than a fixed parameter. Second, different numerical methods should be compared because each method has different sources of error. Third, the distinction between model-implied volatility quantities and market-defined indices must be maintained throughout the analysis.
+
+These implications directly motivate the W3 and W4 components. The Monte Carlo engine provides a flexible simulation-based framework, while the COS engine provides a deterministic characteristic-function-based benchmark. Their comparison strengthens the internal validation of the project and prepares the framework for later empirical extensions.
