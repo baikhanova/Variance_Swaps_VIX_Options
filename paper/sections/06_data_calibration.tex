@@ -1,0 +1,160 @@
+\section{Market Data and Joint Calibration}
+\label{sec:data_calibration}
+
+This section connects the pricing framework of Sections~\ref{sec:monte_carlo} and~\ref{sec:cos_pricing} to market data. It also presents the numerical investigation of the joint calibration problem introduced in Section~\ref{sec:theory}. Two markets are used as calibration targets: the SPX implied-volatility surface and the VIX futures term structure. The W5 data pipeline provides the VIX side, while the SPX side is obtained from a single-date option-chain snapshot. The objective is not to produce a perfect calibration but to study whether a one-factor Heston model can reproduce both markets at the same time.
+
+\subsection{Calibration Snapshot}
+
+The calibration is performed at a single trading date. Working with one snapshot has two practical advantages. First, the SPX option chain provided by free data sources reports only the live chain rather than a historical surface, so a date-by-date calibration would require an extended data subscription. Second, the goal of W6 is structural rather than empirical: a single date is sufficient to expose the joint-calibration mismatch that follows from the one-factor structure of Heston, and additional dates would mainly add noise without changing the qualitative result.
+
+The snapshot consists of three components: the SPX spot level, a cross-section of SPX option prices across several maturities and strikes, and the VIX futures term structure with maturities ranging from one month to six months. The risk-free rate is treated as a flat proxy because the dependence of SPX option values on the short rate is mild relative to the dependence on volatility parameters at the horizons considered here.
+
+\subsection{SPX Implied-Volatility Surface}
+
+Each SPX option quote is converted from a mid-price to a Black-Scholes implied volatility through a Brent root finder applied to the standard formula. Out-of-the-money quotes are retained while deep-in-the-money quotes are discarded, since the latter contain little information about the smile shape and their implied volatility inversion becomes numerically unstable as the time value collapses. The retained quotes are restricted to log-moneyness within a band of \(\pm 0.4\), which removes far-wing observations whose bid--ask spreads dominate the value.
+
+The model implied volatility surface is computed by pricing each quote under Heston via the COS method and inverting the model price back into an implied volatility. To accelerate the inner calibration loop, all quotes that share a common maturity are priced in a single call that reuses the Heston characteristic function. The inversion is avoided altogether inside the objective by approximating the implied-volatility residual by its first-order Taylor expansion around the market quote, which equals the price residual divided by the Black-Scholes vega evaluated at the market implied volatility.
+
+\subsection{Heston Characteristic Function for the Log-Stock}
+
+The COS pricer for SPX options requires the characteristic function of \(x_T=\ln S_T\) under Heston. The standard derivation introduces a complex square root whose branch can flip for long maturities and lead to spurious price oscillations. To avoid this issue, the implementation uses the so-called Little Trap representation due to \citet{albrecher2007littletrap}. With \(\xi=\kappa-\sigma_v\rho i u\) and \(d=\sqrt{\xi^2+\sigma_v^2(u^2+iu)}\), the characteristic function is
+\begin{equation}
+\varphi_{x_T}(u)
+=
+\exp\!\Big(
+i u (\ln S_0 + (r-q)T) + C(u,T) + D(u,T)\,v_0
+\Big),
+\label{eq:heston_logstock_cf}
+\end{equation}
+with
+\begin{align}
+D(u,T) &= \frac{\xi-d}{\sigma_v^2}\,\frac{1-e^{-dT}}{1-g\,e^{-dT}},\\
+C(u,T) &= \frac{\kappa\theta}{\sigma_v^2}
+\left[(\xi-d) T - 2\ln\!\frac{1-g\,e^{-dT}}{1-g}\right],\\
+g &= \frac{\xi-d}{\xi+d}.
+\end{align}
+The expression for \(g\) keeps the argument of the complex logarithm inside the unit disk and removes the discontinuities that affect the original Heston formulation.
+
+\subsection{SPX COS Pricer}
+
+The European call price under Heston is obtained from the general Fang--Oosterlee COS formula \citep{fang2008cos}:
+\begin{equation}
+C_0(K,T)
+\approx
+e^{-rT}
+\sideset{}{'}\sum_{k=0}^{N-1}
+\operatorname{Re}\!\left[
+\varphi_{x_T}\!\left(\frac{k\pi}{b-a}\right)
+e^{-ik\pi a/(b-a)}
+\right]
+V_k^{\mathrm{call}},
+\label{eq:cos_spx_price}
+\end{equation}
+where the payoff coefficients are available in closed form. For a call, the relevant payoff integral runs from \(\ln K\) to \(b\), and the integrand is split into the exponential term and the strike term, each of which integrates analytically against a cosine kernel:
+\begin{align}
+V_k^{\mathrm{call}} &= \frac{2}{b-a}\,\big(\chi_k(\ln K,b) - K\,\psi_k(\ln K,b)\big),\\
+\chi_k(c,d) &= \frac{1}{1+\big(k\pi/(b-a)\big)^2}
+\Big(e^d\cos(\omega_k(d-a))-e^c\cos(\omega_k(c-a))\nonumber\\
+&\qquad +\omega_k\,e^d\sin(\omega_k(d-a))-\omega_k\,e^c\sin(\omega_k(c-a))\Big),\\
+\psi_k(c,d) &=
+\begin{cases}
+d-c, & k=0,\\
+\big(\sin(\omega_k(d-a))-\sin(\omega_k(c-a))\big)/\omega_k, & k\ge 1,
+\end{cases}
+\end{align}
+with \(\omega_k=k\pi/(b-a)\). The truncation interval \([a,b]\) is set from the Heston cumulants following the Fang--Oosterlee rule \(a=c_1-L\sqrt{c_2+\sqrt{c_4}}\) and \(b=c_1+L\sqrt{c_2+\sqrt{c_4}}\), with \(L=10\) for stochastic-volatility models.
+
+The COS prices are cross-checked against a fifty-thousand-path Monte Carlo simulation of the Heston SDE. The two engines agree to within two per cent at every quote considered, which is consistent with the sampling error of the simulation at the chosen path count.
+
+\subsection{VIX-Side Pricing}
+
+The VIX-side pricer is the W4 COS engine described in Section~\ref{sec:cos_pricing}. For a model VIX futures price the engine evaluates
+\begin{equation}
+F^{\mathrm{model}}(0,T)
+=
+e^{-rT}\,
+\mathbb{E}^{\mathbb{Q}}\!\left[100\sqrt{A_\Delta+B_\Delta\,v_T}\right],
+\label{eq:vix_futures_model}
+\end{equation}
+using the closed-form CIR characteristic function of terminal variance and the same Fourier-cosine recipe used for VIX options. Only the four parameters \((\kappa,\theta,\sigma_v,v_0)\) of the variance leg affect the VIX futures level; the correlation \(\rho\) is not identified from the VIX market alone and is fixed by convention.
+
+\subsection{Calibration Objective}
+
+The parameter vector
+\begin{equation}
+x=(\kappa,\theta,\sigma_v,\rho,v_0)
+\end{equation}
+is constrained by a rectangular box of admissible values and by a soft penalty on the Feller condition \(2\kappa\theta\ge\sigma_v^2\). The penalty is quadratic in the deficit and prevents the optimiser from drifting into regions of parameter space where the variance process spends a non-trivial amount of time at zero. The SPX loss is
+\begin{equation}
+L_{\mathrm{SPX}}(x)
+=
+\frac{\sum_i w_i \big((\hat C^{\mathrm{model}}_i - C^{\mathrm{market}}_i)/\nu_i\big)^2}
+{\sum_i w_i},
+\label{eq:spx_loss}
+\end{equation}
+where \(\nu_i\) is the Black-Scholes vega of quote \(i\) evaluated at its market implied volatility, and the weights \(w_i\) default to \(\nu_i\) so that at-the-money observations dominate. The VIX loss is the mean squared error of the model futures curve in VIX-point units:
+\begin{equation}
+L_{\mathrm{VIX}}(x)
+=
+\frac{1}{M}\sum_{m=1}^{M}\big(F^{\mathrm{model}}(0,T_m;x)-F^{\mathrm{market}}_m\big)^2.
+\label{eq:vix_loss}
+\end{equation}
+The joint loss combines the two markets:
+\begin{equation}
+L_{\mathrm{joint}}(x;\alpha)
+=
+\alpha\,s_{\mathrm{SPX}}L_{\mathrm{SPX}}(x)
++
+(1-\alpha)\,s_{\mathrm{VIX}}L_{\mathrm{VIX}}(x)
++
+\Phi_{\mathrm{Feller}}(x),
+\label{eq:joint_loss}
+\end{equation}
+where \(s_{\mathrm{SPX}}\) and \(s_{\mathrm{VIX}}\) are fixed scale factors that bring the two losses to comparable orders of magnitude, and \(\Phi_{\mathrm{Feller}}\) denotes the Feller penalty. The mixing weight \(\alpha\) controls the relative importance of the two markets; the baseline value is \(\alpha=0.5\), and a small sensitivity sweep is reported in the results section.
+
+\subsection{Optimisation Strategy}
+
+The Heston calibration objective is non-convex with multiple local minima, particularly along the \((\kappa,\sigma_v)\) ridge. To avoid trapping in a local optimum, the optimiser uses a two-stage strategy:
+\begin{enumerate}
+\item A global search by differential evolution \citep{storn1997differential} over the parameter box, with population size eighteen, forty generations, and three random seeds;
+\item A local refinement of the best differential-evolution point by an L-BFGS-B step with bound constraints.
+\end{enumerate}
+The lowest refined loss across the three seeds is reported as the calibrated parameter vector. The same procedure is used for the SPX-only, VIX-only, and joint problems so that the three runs are comparable.
+
+\subsection{Calibration Results}
+
+Three calibrations are run on the same snapshot: an SPX-only fit, a VIX-only fit, and a joint fit with \(\alpha=0.5\). For each calibrated parameter vector the per-market RMSE is recomputed on the same yardstick so that the three runs are evaluated independently of the loss they actually minimised. The full table of parameters and RMSEs is produced by the W6 notebook and saved under \texttt{outputs/w6/calibration\_summary.csv}.
+
+Table~\ref{tab:w6_calibration} reports the parameters and RMSEs obtained on the notebook snapshot.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lrrrrrrr}
+\toprule
+Calibration & $\kappa$ & $\theta$ & $\sigma_v$ & $\rho$ & $v_0$ & SPX IV RMSE & VIX RMSE (pts) \\
+\midrule
+SPX-only            & 0.97 & 0.064 & 0.35 & $-0.94$       & 0.033 & 0.016 & 5.90 \\
+VIX-only            & 0.21 & 0.250 & 0.05 & $-0.70$ (fixed) & 0.005 & 0.071 & 1.32 \\
+Joint $\alpha=0.50$ & 0.22 & 0.240 & 0.05 & $-0.57$       & 0.005 & 0.056 & 1.33 \\
+\bottomrule
+\end{tabular}
+\caption{Heston parameters and per-market root mean squared errors for the three W6 calibrations.}
+\label{tab:w6_calibration}
+\end{table}
+
+The SPX-only fit reproduces the equity smile across all maturities with the expected strongly negative correlation \(\rho=-0.94\), but the implied VIX futures curve computed from the same parameters sits about \(5.9\) VIX points away from the market. The VIX-only fit reproduces the futures curve to within \(1.3\) VIX points but produces a flat SPX smile because \(\rho\) is not identified from the VIX market and the optimiser returns the convention value \(-0.7\). The joint fit lands close to the VIX-only solution: under the fixed loss scales used here, the VIX mean squared error dominates the joint objective, so the optimiser sacrifices SPX fit to keep the futures curve close to the market while making only a small adjustment in \(\rho\).
+
+A sensitivity sweep over \(\alpha\in\{0.25,0.50,0.75\}\) traces the trade-off between SPX RMSE and VIX RMSE. Across the three weights the VIX RMSE is essentially flat at \(1.33\) points, while the SPX RMSE moves between \(0.055\) and \(0.056\). No value of \(\alpha\) simultaneously delivers an SPX RMSE below the SPX-only level (\(0.016\)) and a VIX RMSE below the VIX-only level (\(1.32\)). This is the empirical signature of the structural mismatch.
+
+\subsection{Interpretation}
+
+The numerical results match the qualitative prediction of Section~\ref{sec:theory}. A one-factor stochastic-volatility model cannot reproduce the joint dynamics of SPX options and VIX futures because the same parameter set must control the smile of the equity market and the curve of the variance market. The negative correlation \(\rho\) that the SPX smile requires has no analogue on the VIX side, and the long-run mean \(\theta\) and mean-reversion speed \(\kappa\) preferred by the VIX curve are not the same as those that reproduce the equity skew.
+
+This finding is consistent with the established literature on joint SPX--VIX calibration and motivates the model extensions outlined in the next section. In particular, two-factor stochastic-volatility models, forward variance specifications, and rough volatility models all attempt to decouple the SPX and VIX dynamics by introducing additional state variables or by relaxing the Markovian assumption on the variance process.
+
+\subsection{Limitations of the W6 Calibration}
+
+The W6 calibration has several limitations. First, it is based on a single snapshot date and does not study parameter stability through time. Second, the SPX surface is obtained from yfinance mid-quotes, which are noisier than data from a paid market-data feed and contain stale quotes on illiquid maturities. Third, the VIX futures term structure is taken from the W5 pipeline, which uses CBOE settlements where available and a CIR-implied synthetic curve when the live download is not. Fourth, the joint objective uses a fixed pair of scale factors rather than an adaptive weighting based on the local Hessian of each loss.
+
+These limitations are not expected to change the structural conclusion that one-factor Heston cannot simultaneously fit both markets. They do affect the precise magnitude of the RMSEs reported in the results section, and a more refined version of the calibration could be undertaken once richer market data becomes available.
