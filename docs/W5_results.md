@@ -17,18 +17,16 @@ The W5 workflow includes:
 - downloading SPX market data;
 - obtaining VIX futures settlement data;
 - computing realised variance from SPX returns;
-- computing ex-post volatility risk premium:
-
-\[
-VRP_t =
-\frac{VIX_t^2}{12}
--
-RV_{t,t+1M}
-\]
-
+- computing ex-post volatility risk premium;
 - computing ex-ante VRP using GARCH(1,1) forecasts;
 - identifying crisis periods;
 - generating exploratory plots.
+
+The ex-post volatility risk premium is computed as:
+
+$$
+VRP_t = \frac{VIX_t^2}{12} - RV_{t,t+1M}
+$$
 
 
 
@@ -53,23 +51,17 @@ Sample period:
 
 ## Realised variance calculation
 
-Realised variance is computed from returns:
+Realised variance is computed from log returns:
 
-\[
-RV_t =
-\sum_i r_i^2
-\]
+$$
+RV_t = \sum_i r_i^2
+$$
 
 where:
 
-\[
-r_i
-=
-\log
-\left(
-\frac{S_i}{S_{i-1}}
-\right)
-\]
+$$
+r_i = \log\left(\frac{S_i}{S_{i-1}}\right)
+$$
 
 Monthly realised variance is annualised where appropriate.
 
@@ -79,45 +71,54 @@ Monthly realised variance is annualised where appropriate.
 
 The monthly volatility risk premium is computed as:
 
-\[
-VRP_t
-=
-IV_t
--
-RV_{t,t+1M}
-\]
+$$
+VRP_t = IV_t - RV_{t,t+1M}
+$$
 
-Positive VRP implies investors systematically overpay for volatility protection.
+In this project, one-month implied variance is approximated from the VIX index:
+
+$$
+IV_t = \frac{1}{12}\left(\frac{VIX_t}{100}\right)^2
+$$
+
+Therefore:
+
+$$
+VRP_t = \frac{1}{12}\left(\frac{VIX_t}{100}\right)^2 - RV_{t,t+1M}
+$$
+
+A positive VRP implies that implied variance is higher than subsequently realised variance.
 
 
 
 ## Generated outputs
 
-The following figures were produced:
+The following figures are produced by the W5 pipeline:
 
 1. VIX time series;
 2. VRP time series;
-3. Scatter: VIX vs next-month realised variance;
+3. scatter plot of VIX versus next-month realised variance;
 4. VIX futures term structure;
 5. VIX correlation with SPX returns;
-6. Crisis-period analysis.
+6. realised variance versus implied variance decomposition.
 
 
 
 ## Crisis analysis
 
-The following stress periods were analysed:
+The following stress periods are analysed:
 
-| Crisis | Main feature |
+| Crisis period | Main feature |
 |---|---|
-| 2020 COVID shock | Extreme VIX spike |
-| 2022 inflation shock | Elevated volatility regime |
+| 2020 COVID shock | Extreme VIX spike and large realised variance |
+| 2022 inflation shock | Elevated volatility regime and unstable VRP |
 
 Expected observations:
 
-- sharp increase in implied volatility;
-- compression or inversion of VRP;
-- stronger negative correlation between VIX and SPX.
+- implied volatility increases sharply;
+- realised variance rises after market shocks;
+- VRP compresses or becomes negative;
+- correlation between VIX changes and SPX returns becomes strongly negative.
 
 
 
@@ -125,12 +126,13 @@ Expected observations:
 
 The analysis confirms several stylised facts:
 
-1. VIX spikes during periods of market stress.
-2. Volatility risk premium is usually positive.
-3. Realised variance tends to remain below implied variance.
-4. Crisis periods produce temporary breakdowns in normal VRP behaviour.
+1. VIX rises sharply during market stress.
+2. Implied variance is usually higher than future realised variance.
+3. The volatility risk premium is generally positive in calm markets.
+4. Crisis periods create temporary breakdowns in normal VRP behaviour.
+5. VIX and SPX returns are negatively related, especially during stress periods.
 
-These findings are consistent with the volatility risk premium literature and motivate variance swap strategies studied in later sections.
+These findings are consistent with the interpretation of volatility as an insurance asset class. Investors pay a premium for protection against market volatility, and sellers of variance earn this premium in normal periods while taking crisis risk.
 
 
 
@@ -145,9 +147,8 @@ The W5 module currently includes:
 - crisis-period identification;
 - notebook implementation for reproducible analysis.
 
-The outputs will be used in:
+The outputs from W5 will be used in later project stages:
 
-- W6 calibration;
-- W7 volatility surface analysis;
-- W8 VRP backtesting and strategy evaluation.
-
+- W6: joint SPX–VIX calibration;
+- W7: volatility surface and VRP analysis;
+- W8: VRP strategy backtesting and risk analysis.
