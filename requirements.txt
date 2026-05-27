@@ -4,3 +4,7 @@ scipy
 matplotlib
 jupyter
 pytest
+yfinance
+arch
+pandas-datareader
+statsmodels
