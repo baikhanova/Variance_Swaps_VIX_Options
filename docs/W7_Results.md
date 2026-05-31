@@ -20,7 +20,7 @@ The implied vol smile is parametrised using a cubic skew model:
 
 $$\text{IV}(k) = \sigma_{\text{ATM}} \cdot \left(1 + \text{skew} \cdot k + \text{curl} \cdot k^2 + \text{asymm} \cdot k^3\right)$$
 
-where $k = \ln(K/F)$ is the log-moneyness. The parameters are set to $\text{skew} = +0.30$, $\text{curl} = 0.20$, and $\text{asymm} = +0.06$, consistent with the qualitative shapes documented in Lian and Zhu (2013) and Mencía and Sentana (2013). Mean reversion under CIR attenuates the effective vol-of-vol over longer horizons through the factor:
+where $k = \ln(K/F)$ is the log-moneyness. The parameters are set to $\text{skew} = +0.30$, $\text{curl} = 0.20$, and $\text{asymm} = +0.06$, consistent with the qualitative shapes documented in Lian and Zhu (2013) and Mencía and Sentana (2013). The impact of mean reversion becomes stronger at longer maturities and is captured by the factor:
 
 $$\text{att}(T) = \sqrt{\frac{1 - e^{-\kappa T}}{\kappa T}}$$
 
@@ -73,7 +73,7 @@ The quantitative signature is the risk reversal: at the one-month horizon, VIX 2
 
 The one-month SPX 25-delta risk reversal of **-9.55 vol points** quantifies this effect: OTM puts are nearly 10 vol points more expensive than OTM calls at the same delta.
 
-**Joint interpretation.** The two effects are not independent. A severe SPX decline is precisely the event that causes VIX to spike. From that perspective, the elevated left wing of the SPX smile and the elevated right wing of the VIX smile are two views of the same underlying crisis scenario, priced from different vantage points. The SPX left wing reflects the cost of insuring against the crash; the VIX right wing reflects the cost of directly expressing or hedging the associated volatility spike.
+**Joint interpretation.** The two effects are not independent. A severe SPX decline is precisely the event that causes VIX to spike. From that perspective, the elevated left wing of the SPX smile and the elevated right wing of the VIX smile are two views of the same underlying crisis scenario, priced from different vantage points. The left side of the SPX smile reflects the cost of protection against a market decline, while the right side of the VIX smile reflects the cost of protection against a volatility spike.
 
 ---
 
