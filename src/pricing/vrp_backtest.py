@@ -46,7 +46,7 @@ HESTON_PARAMS = HestonParams(
     rho=-0.72,
 )
 
-
+# physical-measure params: lower long-run variance gives positive VRP
 HESTON_PHYSICAL = HestonParams(
     s0=100.0,
     v0=0.0441,
