@@ -57,9 +57,7 @@ HESTON_PHYSICAL = HestonParams(
     rho=-0.72,
 )
 
-
-
-
+# --- Part A: model-free hedge ---
 def black_scholes_call(S, K, T, r, sigma):
     if T <= 0 or sigma <= 0:
         return max(S - K * exp(-r * T), 0.0)
@@ -67,7 +65,6 @@ def black_scholes_call(S, K, T, r, sigma):
     d2 = d1 - sigma * sqrt(T)
     from scipy.stats import norm
     return S * norm.cdf(d1) - K * exp(-r * T) * norm.cdf(d2)
-
 
 def black_scholes_put(S, K, T, r, sigma):
     # put via parity
@@ -85,12 +82,10 @@ def model_free_variance_from_options(S, F, T, r, strikes, iv_surface):
     integrand = dk / (strikes**2) * np.exp(r * T) * Q
     return (2.0 / T) * float(np.sum(integrand))
 
-
 def model_free_vega_weights(F, T, r, strikes):
     # weights only depend on strike grid, not on any vol model
     dk = np.gradient(strikes)
     return (2.0 / T) * np.exp(r * T) * dk / (strikes**2)
-
 
 def demonstrate_model_free_hedge(S=100.0, F=102.0, T=1.0/12, r=0.02, n_strikes=100):
     strikes = np.linspace(0.6 * S, 1.5 * S, n_strikes)
