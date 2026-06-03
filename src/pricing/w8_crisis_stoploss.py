@@ -46,3 +46,41 @@ COLORS = {
     "grey":  "#7f8c8d",
     "gold":  "#f39c12",
 }
+# crisis analysis helpers
+
+def compute_drawdown_series(equity: pd.Series) -> pd.Series:
+    # drawdown at each point = (current - peak so far) / peak
+    running_max = equity.cummax()
+    return (equity - running_max) / running_max
+
+
+def crisis_summary(result) -> dict:
+    # pull the key numbers we need for the crisis section
+    df = result.monthly_pnl
+    eq = result.equity_curve
+
+    dd = compute_drawdown_series(eq)
+    max_dd = float(dd.min())
+    max_dd_date = dd.idxmin()
+
+    worst_idx = df["net_pnl"].idxmin()
+    worst_pnl = float(df["net_pnl"].min())
+
+    # march 2020 is the main crisis event — covid crash, VIX hit ~85
+    march_2020_mask = (df.index.year == 2020) & (df.index.month == 3)
+    march_2020_pnl = float(df.loc[march_2020_mask, "net_pnl"].sum()) if march_2020_mask.any() else None
+
+    # flag any month where the loss was more than 2 standard deviations
+    monthly_returns = df["net_pnl"] / VEGA_TARGET
+    vol = monthly_returns.std()
+    crisis_mask = monthly_returns < -2 * vol
+    crisis_months = df.index[crisis_mask].tolist()
+
+    return {
+        "max_drawdown": max_dd,
+        "max_drawdown_date": max_dd_date,
+        "worst_month_pnl": worst_pnl,
+        "worst_month_date": worst_idx,
+        "march_2020_pnl": march_2020_pnl,
+        "crisis_months": crisis_months,
+    }
