@@ -25,7 +25,7 @@ from src.pricing.variance_mc import (
     heston_variance_strike,
     vix_squared_from_variance,
 )
-
+# trading calendar constants
 TRADING_DAYS_PER_YEAR = 252
 TRADING_DAYS_PER_MONTH = 21
 MONTHS_PER_YEAR = 12
@@ -35,7 +35,7 @@ VEGA_TARGET = 10_000.0
 VIX_STOP_LOSS = 40.0
 N_MONTHS_BACKTEST = 60
 
-# risk-neutral Heston params, roughly calibrated to SPX 2019-2024
+
 HESTON_PARAMS = HestonParams(
     s0=100.0,
     v0=0.0441,
