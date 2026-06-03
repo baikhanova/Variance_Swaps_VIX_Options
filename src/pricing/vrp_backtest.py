@@ -58,7 +58,7 @@ HESTON_PHYSICAL = HestonParams(
 )
 
 
-# --- Part A: model-free hedge ---
+
 
 def black_scholes_call(S, K, T, r, sigma):
     if T <= 0 or sigma <= 0:
