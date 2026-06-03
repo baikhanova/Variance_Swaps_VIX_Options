@@ -26,7 +26,6 @@ from src.pricing.variance_mc import (
     vix_squared_from_variance,
 )
 
-# trading calendar constants
 TRADING_DAYS_PER_YEAR = 252
 TRADING_DAYS_PER_MONTH = 21
 MONTHS_PER_YEAR = 12
