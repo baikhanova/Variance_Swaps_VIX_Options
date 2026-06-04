@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from math import sqrt
 
 from src.pricing.vrp_backtest import run_vrp_backtest, MONTHS_PER_YEAR
@@ -77,7 +78,6 @@ def load_backtest_df():
 
     df["strategy_return"] = df["net_pnl"] / 10000.0
 
-    # if later real SPX monthly returns are available, replace this
     if "spx_return" not in df.columns:
         df["spx_return"] = 0.0
 
@@ -139,6 +139,49 @@ def build_regime_tables(df: pd.DataFrame):
     return metrics_table, regime_df
 
 
+def save_plots(df: pd.DataFrame, metrics_table: pd.DataFrame):
+    os.makedirs("outputs/w8", exist_ok=True)
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 8))
+
+    # 1. equity curve
+    equity = 100 * (1 + df["strategy_return"]).cumprod()
+    axes[0, 0].plot(df.index, equity, color="steelblue", lw=2)
+    axes[0, 0].axhline(100, color="gray", ls="--", lw=1)
+    axes[0, 0].set_title("Equity Curve")
+    axes[0, 0].grid(alpha=0.3)
+
+    # 2. monthly pnl
+    colors = ["seagreen" if x > 0 else "tomato" for x in df["net_pnl"]]
+    axes[0, 1].bar(df.index, df["net_pnl"], color=colors, alpha=0.85)
+    axes[0, 1].axhline(0, color="gray", lw=1)
+    axes[0, 1].set_title("Monthly Net P&L")
+    axes[0, 1].grid(alpha=0.3)
+
+    # 3. VRP time series
+    axes[1, 0].plot(df.index, df["vrp_vol"], color="purple", lw=2)
+    axes[1, 0].axhline(3, color="green", ls="--", lw=1, label="High VRP")
+    axes[1, 0].axhline(1, color="orange", ls="--", lw=1, label="Low VRP")
+    axes[1, 0].set_title("VRP Regimes")
+    axes[1, 0].legend()
+    axes[1, 0].grid(alpha=0.3)
+
+    # 4. Sharpe by regime
+    sharpe_vals = [
+        metrics_table.loc["Sharpe", "Full Period"],
+        metrics_table.loc["Sharpe", "High VRP (>3)"],
+        metrics_table.loc["Sharpe", "Low VRP (<1)"],
+    ]
+    labels = ["Full", "High VRP", "Low VRP"]
+    axes[1, 1].bar(labels, sharpe_vals, color=["steelblue", "green", "red"], alpha=0.85)
+    axes[1, 1].set_title("Sharpe by Regime")
+    axes[1, 1].grid(alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig("outputs/w8/w8_metrics_dashboard.png", dpi=150, bbox_inches="tight")
+    plt.close()
+
+
 def run_metrics_analysis():
     df = load_backtest_df()
     betas, reg_summary = beta_decomposition(df)
@@ -148,5 +191,7 @@ def run_metrics_analysis():
     betas.to_csv("outputs/w8/beta_decomposition.csv", index=False)
     metrics_table.to_csv("outputs/w8/vrp_metrics.csv")
     regime_df.to_csv("outputs/w8/vrp_regimes.csv")
+
+    save_plots(df, metrics_table)
 
     return df, betas, reg_summary, metrics_table, regime_df
