@@ -1,0 +1,458 @@
+\documentclass[aspectratio=169, 11pt]{beamer}
+
+% ── Packages ──
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath, amssymb, mathtools}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+% ── Theme ──
+\usetheme{Madrid}
+\usecolortheme{whale}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+% ── Custom colors ──
+\definecolor{darkblue}{HTML}{1E3A5F}
+\definecolor{accentorange}{HTML}{E8842C}
+\definecolor{lightbg}{HTML}{F0F4F8}
+
+\setbeamercolor{title}{fg=white, bg=darkblue}
+\setbeamercolor{frametitle}{fg=white, bg=darkblue}
+\setbeamercolor{structure}{fg=darkblue}
+\setbeamercolor{block title}{bg=darkblue, fg=white}
+\setbeamercolor{block body}{bg=lightbg}
+\setbeamercolor{item}{fg=accentorange}
+
+% ── Fonts ──
+\usefonttheme{professionalfonts}
+
+% ── Title ──
+\title{Volatility as an Asset Class}
+\subtitle{From the Variance Risk Premium to a Short-Variance Strategy}
+\author{Group 4}
+\date{Covered: W5 VRP Reconstruction, W6 Joint Calibration, W7 Vol Surface, W8 Alpha \& Risk\\[4pt]
+\textit{Stochastic Processes --- Group Research Projects}}
+
+% ════════════════════════════════════════════════════
+\begin{document}
+
+% ── Slide 1: Title ──
+\begin{frame}[plain]
+  \titlepage
+\end{frame}
+
+% ── Slide 2: Structure ──
+\begin{frame}{Structure of Presentation (W5--W8)}
+  \begin{enumerate}
+    \item Recap --- where W1--W4 left the engine
+    \item W5 -- Variance risk premium: definition \& reconstruction
+    \item W5 -- VRP time series: ex-ante vs.\ ex-post
+    \item W6 -- Joint SPX--VIX calibration \& the one-factor failure
+    \item W6 -- Why a second variance factor is needed
+    \item W7 -- VIX volatility surface (vol-of-vol)
+    \item W7 -- VIX smile vs.\ SPX smile
+    \item W8 -- Short-variance strategy: Sharpe decomposition
+    \item W8 -- Negative-VRP regimes \& the model-free hedge
+    \item Deliverables audit \& conclusion
+  \end{enumerate}
+\end{frame}
+
+% ── Slide 3: Recap ──
+\begin{frame}{Recap --- The Engine Built in W1--W4}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{What we already have}
+\begin{itemize}
+  \item \textbf{W2:} CIR variance, $K_{\mathrm{var}}$, $\mathrm{VIX}^2 = A + Bv_t$ affine formula, CIR characteristic function
+  \item \textbf{W3:} Monte Carlo engine --- Heston paths, realised variance, VIX call pricing
+  \item \textbf{W4:} Fourier/COS engine --- VIX call, put, futures; term structure; 27 tests passing
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{What W5--W8 add}
+\begin{itemize}
+  \item \textbf{W5:} reconstruct the variance risk premium (VRP) time series
+  \item \textbf{W6:} joint SPX--VIX calibration; demonstrate the single-factor limitation
+  \item \textbf{W7:} VIX vol-of-vol surface; SPX vs.\ VIX smile
+  \item \textbf{W8:} turn the VRP into a tradable short-variance strategy + hedge
+\end{itemize}
+\end{columns}
+
+\vspace{6pt}
+\begin{block}{Methodological note}
+\small
+The project is \textbf{fully model-based} (CIR / Heston). Every series in W5--W8 is
+\textit{simulated} from the model under the physical ($\mathbb{P}$) and risk-neutral
+($\mathbb{Q}$) measures rather than measured from market quotes --- this keeps W5--W8
+internally consistent with the W3 (MC) and W4 (COS) engines.
+\end{block}
+\end{frame}
+
+% ── Slide 4: W5 VRP definition ──
+\begin{frame}{W5 -- The Variance Risk Premium (Carr \& Wu, 2009)}
+
+\textbf{Definition.}\; The variance risk premium is the gap between what the option
+market \textit{charges} for variance and what variance \textit{realises}:
+\[
+  \mathrm{VRP}_t \;=\; \underbrace{\mathrm{IV}_t^2}_{\text{risk-neutral } \mathbb{Q}}
+  \;-\; \underbrace{\mathrm{RV}_{t,\,t+\Delta}}_{\text{physical } \mathbb{P}}.
+\]
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Implied leg (what you pay)}
+\begin{itemize}
+  \item $\mathrm{IV}_t^2 = $ model $\mathrm{VIX}_t^2$ at the current state $v_t$, using the
+        \textbf{risk-neutral} CIR parameters
+  \item $\mathrm{IV}_t^2 = A_{\mathbb{Q}} + B_{\mathbb{Q}}\,v_t$ --- read straight off the affine formula
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{Realised leg (what you receive)}
+\begin{itemize}
+  \item $\mathrm{RV}_{t,t+\Delta} = $ variance realised over the next month along the
+        \textbf{physical} path
+  \item Continuous-limit quadratic variation $\tfrac{1}{\Delta}\!\int_t^{t+\Delta} v_s\,ds$
+        --- removes squared-return sampling noise
+\end{itemize}
+\end{columns}
+
+\vspace{6pt}
+\begin{block}{Where the premium comes from}
+\small
+A positive premium is produced by $\theta_{\mathbb{Q}} > \theta_{\mathbb{P}}$: investors pay
+up for variance protection. Faster risk-neutral mean reversion
+($\kappa_{\mathbb{Q}} > \kappa_{\mathbb{P}}$) lets the \textit{ex-ante} premium turn negative
+only at extreme volatility --- exactly the crisis behaviour Carr \& Wu document.
+\end{block}
+\end{frame}
+
+% ── Slide 5: W5 ex-ante vs ex-post ──
+\begin{frame}{W5 -- VRP Time Series: Ex-ante vs.\ Ex-post}
+\small
+One long daily $(S_t, v_t)$ path is simulated under $\mathbb{P}$ over
+\textbf{300 months ($\sim$25 years)}; at each month start we read $\mathrm{IV}_t^2$ ($\mathbb{Q}$)
+and measure $\mathrm{RV}$ over the following month.
+
+\medskip
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Ex-ante VRP} --- the \textit{signal}
+\[
+  \mathrm{VRP}^{\text{ante}}_t = \mathrm{IV}_t^2 - \mathbb{E}^{\mathbb{P}}_t[\mathrm{RV}]
+\]
+\begin{itemize}
+  \item compares two \textit{forecasts} --- smooth
+  \item rarely negative; the harvestable premium
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{Ex-post VRP} --- the \textit{P\&L}
+\[
+  \mathrm{VRP}^{\text{post}}_t = \mathrm{IV}_t^2 - \mathrm{RV}_{t,t+\Delta}
+\]
+\begin{itemize}
+  \item realised short-variance return --- noisy
+  \item drives the strategy Sharpe (W8)
+\end{itemize}
+\end{columns}
+
+\vspace{4pt}
+\begin{center}
+\begin{tabular}{lc}
+  \toprule
+  Statistic (300 simulated months) & Value \\
+  \midrule
+  Mean ex-ante VRP (volatility points) & $+0.99$ \\
+  Mean realised (ex-post) VRP (volatility points) & $+1.13$ \\
+  Fraction of months with ex-ante VRP $< 0$ & $9.0\%$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\centering\footnotesize
+Implied volatility sits $\sim$1 point above realised on average --- a persistent, harvestable premium.
+\end{frame}
+
+% ── Slide 6: W6 joint calibration ──
+\begin{frame}{W6 -- The Joint SPX--VIX Calibration Problem}
+
+\textbf{Setup (Bergomi, 2005 --- ``Smile Dynamics'').}\; One variance factor must
+simultaneously reproduce \textit{two} market objects:
+
+\medskip
+\begin{enumerate}
+  \item the \textbf{SPX implied-volatility surface} (level + skew of equity options), and
+  \item the \textbf{VIX futures term structure} $F(0,T) = \mathbb{E}^{\mathbb{Q}}[100\sqrt{A + B v_T}]$.
+\end{enumerate}
+
+\vspace{4pt}
+\begin{block}{The operational test (4 steps)}
+\small
+\begin{enumerate}
+  \item Calibrate Heston/CIR to the SPX options surface $\Rightarrow$ $(\kappa,\theta,\sigma_v,\rho)$.
+  \item Feed those parameters into the COS engine to get the \textit{model} VIX futures curve.
+  \item Compare against the observed VIX futures curve.
+  \item Observe the discrepancy $\Rightarrow$ conclude a single factor cannot fit both.
+\end{enumerate}
+\end{block}
+
+\vspace{2pt}
+\textbf{Why it fails.}\; The same $\sigma_v$ that sets the SPX skew also sets the
+vol-of-vol that governs the VIX smile and futures convexity. Fitting one over-/under-shoots
+the other --- the parameters are \textbf{over-determined}.
+\end{frame}
+
+% ── Slide 7: W6 multi-factor motivation ──
+\begin{frame}{W6 -- Why a Second Variance Factor Is Needed}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Single-factor CIR limitation}
+\begin{itemize}
+  \item $\mathrm{VIX} = 100\sqrt{A + Bv}$ \textit{compresses} the right tail of $v$
+  \item A moderate $\sigma_v$ gives an almost \textbf{flat} (or slightly negative) VIX smile
+  \item Cannot match the empirically strong \textbf{positive} VIX skew and the SPX skew at once
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{Extensions that restore the fit}
+\begin{itemize}
+  \item \textbf{Two-factor CIR:} $v_t = v_t^{(1)} + v_t^{(2)}$ --- one fast, one slow factor
+  \item \textbf{Rough volatility:} fractional / rough Heston (El~Euch \& Rosenbaum, 2019) --- fat right tail of $v$
+  \item \textbf{Variance jumps:} add upward jumps in $v_t$ to thicken the VIX right tail
+\end{itemize}
+\end{columns}
+
+\vspace{6pt}
+\begin{block}{Conclusion of W6}
+\small
+The single-factor failure is not a calibration bug --- it is structural. It is the
+direct motivation for the multi-factor / rough-volatility frontier reviewed in W1, and
+the reason the literature moved to \textbf{forward-variance} models.
+\end{block}
+\end{frame}
+
+% ── Slide 8: W7 vol-of-vol surface ──
+\begin{frame}{W7 -- VIX Implied-Volatility Surface (Vol-of-Vol)}
+
+\textbf{Construction.}\; VIX option prices come from the W4 COS engine over a
+(maturity $\times$ strike) grid (\texttt{build\_vix\_option\_surface}). Each price is
+inverted into a \textbf{Black-76 implied volatility} using the VIX futures as the
+forward --- the result is the \textit{volatility of the VIX}.
+
+\medskip
+\begin{center}
+\begin{tabular}{lccccc}
+  \toprule
+  Maturity & 1M & 2M & 3M & 6M & 12M \\
+  \midrule
+  VIX futures forward $F_{\mathrm{VIX}}$ & 14.14 & 12.81 & 12.25 & 11.63 & 11.28 \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+\begin{itemize}
+  \item Out-of-the-money options inverted (calls for $K \ge F$, puts for $K < F$) --- they carry all the time value and give the most stable root.
+  \item Inversion shares \textbf{one} Black-76 model with the SPX smile, so the two are directly comparable.
+  \item An elevated vol-of-vol ($\sigma_v = 1.5$) is used so the one-factor model can actually \textit{show} a VIX skew --- see the model note on the next slide.
+\end{itemize}
+\end{frame}
+
+% ── Slide 9: W7 smile comparison ──
+\begin{frame}{W7 -- VIX Smile vs.\ SPX Smile: Two Sides of One Coin}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{SPX --- negative (put) skew}
+\[
+  \tfrac{d\,\mathrm{IV}}{d(K/F)} = \mathbf{-0.397}
+\]
+\begin{itemize}\small
+  \item OTM puts richer than OTM calls
+  \item \textbf{Leverage effect:} $\rho < 0$, a falling market raises volatility
+  \item fattens the \textbf{left} tail of equity returns $\Rightarrow$ crash puts expensive
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{VIX --- positive (call) skew}
+\[
+  \tfrac{d\,\mathrm{IV}}{d(K/F)} = \mathbf{+0.659}
+\]
+\begin{itemize}\small
+  \item OTM calls richer than OTM puts
+  \item Volatility \textbf{spikes up}, mean-reverts down slowly
+  \item fat \textbf{right} tail of the VIX $\Rightarrow$ VIX calls are crash insurance
+\end{itemize}
+\end{columns}
+
+\vspace{6pt}
+\begin{block}{Same negative spot/vol correlation drives both}
+\small
+The mechanism that depresses the left tail of SPX returns ($\rho<0$) is the same one
+that creates the right tail of the VIX --- so the smiles tilt in \textbf{opposite}
+directions. \textbf{Model note:} a one-factor model only produces the positive VIX skew
+at high $\sigma_v$; the empirically strong skew needs the second factor / jumps from W6.
+\end{block}
+\end{frame}
+
+% ── Slide 10: W8 strategy Sharpe ──
+\begin{frame}{W8 -- Short-Variance Strategy: Sharpe Decomposition}
+
+\textbf{The trade.}\; Sell variance (receive $\mathrm{IV}_t^2$, pay floating $\mathrm{RV}$);
+the monthly P\&L \textit{is} the ex-post VRP. A positive average VRP $\Rightarrow$ a
+positive expected return.
+
+\medskip
+\begin{center}
+\begin{tabular}{lc}
+  \toprule
+  Full-sample annualised Sharpe (300 months) & Value \\
+  \midrule
+  \textbf{Vega notional} (short volatility) & $\mathbf{1.16}$ \\
+  Variance notional (short variance) & $0.52$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+\begin{block}{Why the two Sharpes differ --- the fat-tail signature}
+\small
+The \textbf{vega-notional} Sharpe ($\sim$1.2) is the clean short-vol number. The
+\textbf{variance-notional} Sharpe is lower because one squared volatility spike dwarfs
+years of premium --- $\mathrm{RV}$ enters squared, so a single crisis month dominates the
+P\&L distribution. This gap \textit{is} the fat-tail risk that defines short variance:
+small steady gains, rare large losses.
+\end{block}
+\end{frame}
+
+% ── Slide 11: W8 negative VRP regimes ──
+\begin{frame}{W8 -- When the Premium Disappears: Negative-VRP Regimes}
+\small
+A negative VRP means realised variance came in \textbf{above} the implied level ---
+short-variance loses, long-variance wins. Using the ex-ante signal these months are
+\textbf{rare} and cluster tightly in volatility spikes.
+
+\medskip
+\begin{center}
+\begin{tabular}{lc}
+  \toprule
+  Negative-VRP statistics & Value \\
+  \midrule
+  Negative-VRP episodes & 12 \\
+  Negative months & 27 of 300 \;($9.0\%$) \\
+  \bottomrule
+\end{tabular}
+\qquad
+\begin{tabular}{lcc}
+  \toprule
+  Deepest episode & Min VRP & Peak RV vol \\
+  \midrule
+  Months 125--135 & $-0.0049$ & $41.2$ \\
+  Months 166--167 & $-0.0017$ & $31.8$ \\
+  Months 217--219 & $-0.0015$ & $32.6$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\medskip
+\begin{itemize}
+  \item Fast risk-neutral mean reversion pulls the implied level \textit{below} the still-elevated physical forecast.
+  \item The rolling 12-month Sharpe dips below zero \textbf{exactly} in these spikes --- the regime risk a short-variance book is exposed to.
+\end{itemize}
+\end{frame}
+
+% ── Slide 12: W8 model-free hedge ──
+\begin{frame}{W8 -- Risk Management: The Model-Free Variance Hedge}
+
+\textbf{The replication insight (Demeterfi et al., 1999).}\; A variance swap is
+replicated by a static \textbf{log-contract} --- a continuum of OTM options weighted
+$1/K^2$ --- plus a dynamic futures position:
+\[
+  \mathrm{RV}_{0,T} \;\approx\; \frac{2}{T}\!\left[\int_0^{F}\!\frac{P(K)}{K^2}\,dK
+  + \int_{F}^{\infty}\!\frac{C(K)}{K^2}\,dK\right] + (\text{futures rebalancing}).
+\]
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\textbf{Why this matters for the book}
+\begin{itemize}\small
+  \item The hedge is \textbf{model-free} --- it does not depend on Heston/CIR parameters
+  \item Vega exposure is offset by the static option strip; only the residual is dynamic
+  \item Protects against the negative-VRP crisis regimes of the previous slide
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{Residual risks (sizing limits)}
+\begin{itemize}\small
+  \item \textbf{Discrete strikes:} the $1/K^2$ strip is truncated $\Rightarrow$ jump/gap risk
+  \item \textbf{Tail risk:} one volatility spike can erase years of premium (Slide 10)
+  \item Position sized to the VRP \textit{signal}; cut in high-RV regimes
+\end{itemize}
+\end{columns}
+\end{frame}
+
+% ── Slide 13: Key formulas ──
+\begin{frame}{Key Formulas -- W5--W8 Quick Reference}
+\small
+\renewcommand{\arraystretch}{1.7}
+\begin{tabular}{@{}p{4.2cm}l@{}}
+  \toprule
+  Variance risk premium & $\mathrm{VRP}_t = \mathrm{IV}_t^2 - \mathrm{RV}_{t,t+\Delta}$ \\
+  Implied leg (model VIX$^2$) & $\mathrm{IV}_t^2 = A_{\mathbb{Q}} + B_{\mathbb{Q}}\,v_t$,\quad $B=\dfrac{1-e^{-\kappa\Delta}}{\kappa\Delta}$,\;\; $A=\theta(1-B)$ \\
+  Realised variance (QV limit) & $\mathrm{RV}_{t,t+\Delta} = \dfrac{1}{\Delta}\displaystyle\int_t^{t+\Delta} v_s\,ds$ \\
+  Positive premium condition & $\theta_{\mathbb{Q}} > \theta_{\mathbb{P}}$\;\;(pay up for variance);\;\; sign flips when $\kappa_{\mathbb{Q}} > \kappa_{\mathbb{P}}$ at high $v$ \\
+  Black-76 implied vol & invert $C = e^{-rT}\!\left[F\,N(d_1) - K\,N(d_2)\right]$ for $\sigma$ \\
+  Rolling Sharpe & $\mathrm{SR}_t = \dfrac{\mathrm{mean}_{12}(\mathrm{VRP})}{\mathrm{std}_{12}(\mathrm{VRP})}\sqrt{12}$ \\
+  VIX futures (forward) & $F(0,T)=\mathbb{E}^{\mathbb{Q}}\!\bigl[100\sqrt{A+B\,v_T}\bigr]$ \\
+  Variance-swap replication & $\mathrm{RV}\approx \dfrac{2}{T}\!\displaystyle\int \dfrac{O(K)}{K^2}\,dK$ \;(model-free log-contract) \\
+  \bottomrule
+\end{tabular}
+\end{frame}
+
+% ── Slide 14: Deliverables audit ──
+\begin{frame}{Deliverables Completeness Audit -- W5 through W8}
+\small
+\begin{columns}[T]
+\column{0.5\textwidth}
+\checkmark\; W5 --- VRP defined per Carr \& Wu (2009): $\mathrm{IV}^2 - \mathrm{RV}$\\[2pt]
+\checkmark\; W5 --- 300-month ($\sim$25y) simulated VRP time series\\[2pt]
+\checkmark\; W5 --- ex-ante (signal) vs.\ ex-post (P\&L) decomposition\\[2pt]
+\checkmark\; W5 --- mean VRP $\approx +1$ vol point; $9\%$ months negative\\[2pt]
+\checkmark\; W6 --- joint SPX--VIX calibration test (4-step procedure)\\[2pt]
+\checkmark\; W6 --- single-factor failure demonstrated \& explained\\[2pt]
+\checkmark\; W6 --- two-factor / rough-vol extension motivated
+
+\column{0.5\textwidth}
+\checkmark\; W7 --- VIX vol-of-vol surface via COS + Black-76 inversion\\[2pt]
+\checkmark\; W7 --- VIX call skew $+0.66$ vs.\ SPX put skew $-0.40$\\[2pt]
+\checkmark\; W7 --- economic explanation (negative spot/vol correlation)\\[2pt]
+\checkmark\; W8 --- short-variance strategy; Sharpe $1.16$ (vega) / $0.52$ (variance)\\[2pt]
+\checkmark\; W8 --- negative-VRP regime / crisis analysis (12 episodes)\\[2pt]
+\checkmark\; W8 --- model-free variance-swap hedge (log-contract)\\[2pt]
+\checkmark\; W5--W8 --- unit-tested (\texttt{test\_w7.py}), all passing
+\end{columns}
+\end{frame}
+
+% ── Slide 15: Conclusion ──
+\begin{frame}{Conclusion}
+\begin{center}
+\begin{minipage}{0.88\textwidth}
+  \checkmark\; W5: The variance risk premium is real and persistent --- implied volatility sits $\sim$1 point above realised on average\\[4pt]
+  \checkmark\; W6: A single variance factor cannot jointly fit the SPX surface and the VIX term structure --- a structural, not numerical, limitation\\[4pt]
+  \checkmark\; W7: SPX and VIX smiles tilt in opposite directions; both are driven by the one negative spot/vol correlation\\[4pt]
+  \checkmark\; W8: Harvesting the VRP earns a vega-notional Sharpe of $\sim$1.2, but the fat-tail crisis risk (negative-VRP regimes) is the defining hazard\\[4pt]
+  \checkmark\; The model-free log-contract hedge ties the strategy back to the W2 replication theory\\[12pt]
+  \textbf{Volatility behaves as a genuine, harvestable --- and crash-prone --- asset class.}
+\end{minipage}
+\end{center}
+\end{frame}
+
+\end{document}
