@@ -1,13 +1,13 @@
 \section{Results and Discussion}
 \label{sec:results_discussion}
 
-This section discusses the numerical results obtained from the Monte Carlo and COS pricing engines. The results are based on synthetic model parameters rather than market-calibrated parameters. Therefore, they should be interpreted as internal consistency checks of the numerical framework, not as empirical claims about observed market prices.
+This section discusses the main results obtained across the completed W3--W8 components. The project begins with model-based numerical validation and then moves toward empirical volatility analysis, calibration, volatility-surface interpretation, and volatility risk premium backtesting.
 
-The main purpose of the results section is to verify whether the two independently implemented pricing approaches produce consistent outputs under the same model assumptions. The Monte Carlo engine simulates Heston paths and estimates payoffs by averaging discounted simulated values. The COS engine uses the characteristic function of terminal CIR variance and evaluates the same model-implied VIX payoff through a Fourier-cosine expansion. Agreement between these methods supports the correctness of the numerical implementation.
+The results should be interpreted in stages. W3 and W4 validate the numerical pricing framework under controlled model parameters. W5 connects the framework to market data and realised variance. W6 evaluates whether a one-factor Heston model can jointly fit SPX and VIX-related instruments. W7 studies the structural difference between VIX and SPX volatility surfaces. W8 evaluates the practical behaviour of a volatility risk premium strategy across regimes.
 
-\subsection{Benchmark Parameter Set}
+\subsection{W3--W4 Numerical Validation}
 
-The comparison between Monte Carlo and COS pricing is performed under the following parameter set:
+The first numerical validation compares the Monte Carlo engine from W3 with the COS pricing engine from W4. Both methods price the same model-implied VIX call under the same Heston/CIR parameter set. The benchmark parameters are
 \begin{equation}
 v_0=0.04,\qquad
 \kappa=2,\qquad
@@ -27,96 +27,25 @@ and VIX option strike
 K=20.
 \end{equation}
 
-The values \(v_0=0.04\) and \(\theta=0.04\) imply that the initial variance is equal to the long-run variance. In volatility-point terms, this corresponds approximately to a long-run volatility level of \(20\%\), because \(\sqrt{0.04}=0.20\). This parameter setting is useful for benchmark testing because the model starts near its long-run variance level and does not impose a strong upward or downward mean-reversion effect at the initial time.
+The Monte Carlo engine simulates Heston stock and variance paths, computes realised variance, validates the realised variance against the analytical variance swap strike, and prices the model-implied VIX call. The COS engine uses the characteristic function of terminal CIR variance and computes the same expected payoff through a Fourier-cosine expansion.
 
-\subsection{Monte Carlo Validation through Realised Variance}
+The comparison is summarised in Table~\ref{tab:cos_mc_comparison}.
 
-The first validation step in W3 is the comparison between simulated realised variance and the analytical Heston variance swap strike. The realised variance is computed path by path as
-\begin{equation}
-\widehat{\mathrm{RV}}_{0,T}^{(j)}
-=
-\frac{1}{T}
-\sum_{i=1}^{m}
-\left(
-\log\frac{S_{t_i}^{(j)}}{S_{t_{i-1}}^{(j)}}
-\right)^2.
-\end{equation}
-The analytical benchmark is
-\begin{equation}
-K_{\mathrm{var}}(0,T)
-=
-\theta+
-(v_0-\theta)
-\frac{1-e^{-\kappa T}}{\kappa T}.
-\end{equation}
-
-When the average Monte Carlo realised variance is close to \(K_{\mathrm{var}}(0,T)\), the simulation is consistent with the theoretical expectation of integrated variance. This is an important test because realised variance is computed from simulated stock paths, whereas the analytical strike is derived from the variance process. Agreement between the two confirms that the joint simulation of stock and variance paths behaves consistently with the model.
-
-This test is also useful because it does not require market data. Before calibrating the model to real prices, the implementation can be checked against a known theoretical quantity. In this sense, the variance swap comparison functions as a unit-level validation of the Monte Carlo engine.
-
-\subsection{Monte Carlo VIX Call Price}
-
-The Monte Carlo VIX call price is obtained by transforming terminal variance into the model-implied VIX proxy:
-\begin{equation}
-\widetilde{\mathrm{VIX}}_T
-=
-100\sqrt{A_\Delta+B_\Delta v_T}.
-\end{equation}
-The discounted payoff is then averaged across simulated paths:
-\begin{equation}
-C_0^{MC}
-=
-e^{-rT}
-\frac{1}{N}
-\sum_{j=1}^{N}
-\left(
-100\sqrt{A_\Delta+B_\Delta v_T^{(j)}}-K
-\right)^+.
-\end{equation}
-
-Under the benchmark parameter set, the Monte Carlo estimate is
-\begin{equation}
-C_0^{MC}
-\approx
-1.984952.
-\end{equation}
-This value is simulation-based and therefore depends on the number of paths, the time discretisation, and the random seed. It is not expected to be exactly equal to the COS price. Instead, the Monte Carlo result should be interpreted together with its sampling uncertainty and convergence behaviour.
-
-\subsection{COS VIX Call Price}
-
-The COS method prices the same model-implied VIX call using the terminal CIR characteristic function. The payoff is still
-\begin{equation}
-g(v)
-=
-\left(
-100\sqrt{A_\Delta+B_\Delta v}-K
-\right)^+,
-\end{equation}
-but the expected payoff is computed through a Fourier-cosine expansion rather than through simulated paths.
-
-Under the same benchmark parameter set, the COS price is
-\begin{equation}
-C_0^{COS}
-\approx
-2.008969.
-\end{equation}
-Unlike Monte Carlo, this value is deterministic for a fixed number of COS terms, truncation interval, and integration grid used for payoff coefficients. Therefore, the COS result provides a useful semi-analytical benchmark for the simulation-based estimate.
-
-\subsection{Comparison between Monte Carlo and COS}
-
-The numerical comparison is summarised as follows:
-\begin{center}
+\begin{table}[htbp]
+\centering
 \begin{tabular}{lcc}
 \toprule
 Quantity & Value & Interpretation \\
 \midrule
 COS price & 2.008969 & Characteristic-function-based estimate \\
 Monte Carlo price & 1.984952 & Simulation-based estimate \\
-Absolute difference & 0.024017 & Difference between the two engines \\
+Absolute difference & 0.024017 & Difference between pricing engines \\
 Relative difference & 1.21\% & Difference relative to Monte Carlo price \\
 \bottomrule
 \end{tabular}
-\end{center}
+\caption{Comparison between COS and Monte Carlo prices for the model-implied VIX call.}
+\label{tab:cos_mc_comparison}
+\end{table}
 
 The absolute difference is
 \begin{equation}
@@ -124,9 +53,9 @@ The absolute difference is
 =
 |C_0^{COS}-C_0^{MC}|
 =
-0.024017.
+0.024017,
 \end{equation}
-The relative difference is
+and the relative difference is approximately
 \begin{equation}
 \mathrm{RelError}
 =
@@ -135,93 +64,140 @@ The relative difference is
 1.21\%.
 \end{equation}
 
-This result supports the numerical consistency of the two pricing engines. Exact equality is not expected because the two methods have different sources of numerical error. Monte Carlo contains sampling error and time-discretisation bias. The COS method contains truncation error, finite-series approximation error, and numerical integration error in the payoff coefficients. A relative difference of approximately \(1.21\%\) is therefore acceptable for an internal benchmark at this stage of the project.
+This result supports the numerical consistency of the two independently implemented pricing engines. Exact equality is not expected because Monte Carlo contains sampling and time-discretisation error, while the COS method contains truncation, finite-series approximation, and payoff-integration error.
 
-\subsection{Interpretation of the Pricing Difference}
+\subsection{W5 Market Data and Volatility Risk Premium Findings}
 
-The observed difference between the COS and Monte Carlo prices should be interpreted carefully. A small difference does not prove that both implementations are mathematically perfect, but it provides evidence that the two methods are broadly aligned under the same assumptions.
+The W5 stage extends the project from synthetic model testing to market-data analysis. The data pipeline collects VIX index levels, SPX index data, VIX futures settlement data, and a risk-free rate proxy. From SPX returns, realised variance is computed, while implied variance is approximated from the VIX index.
 
-The Monte Carlo estimate is affected by random sampling. Increasing the number of paths should reduce the sampling component of the error at the rate \(O(N^{-1/2})\). However, increasing the number of paths alone does not remove time-discretisation bias. If the time grid is too coarse, the simulated variance and stock paths may still deviate from the continuous-time model.
-
-The COS estimate, by contrast, is not affected by random sampling. Its accuracy depends mainly on the number of cosine terms \(N\), the truncation interval \([a,b]\), and the numerical computation of payoff coefficients. If the truncation interval is too narrow, the method may exclude relevant probability mass. If the interval is too wide, the approximation may become less efficient.
-
-Therefore, the comparison between COS and Monte Carlo should be viewed as a cross-validation exercise. The two methods are based on different numerical principles. When they produce close results, confidence in the implementation increases.
-
-\subsection{COS Density Recovery}
-
-The COS engine also performs density recovery for terminal CIR variance. The recovered density is computed using the same characteristic function that is used for pricing:
+The volatility risk premium is estimated as
 \begin{equation}
-\widehat{f}_{v_T}(v)
+VRP_t
 =
-\sideset{}{'}\sum_{k=0}^{N-1}
-A_k
-\cos\left(
-\frac{k\pi(v-a)}{b-a}
-\right).
+\frac{1}{12}
+\left(
+\frac{VIX_t}{100}
+\right)^2
+-
+RV_{t,t+1M}.
 \end{equation}
-A basic diagnostic check is whether the recovered density integrates approximately to one:
-\begin{equation}
-\int_a^b \widehat{f}_{v_T}(v)\,dv
-\approx
-1.
-\end{equation}
+A positive value indicates that implied variance exceeds subsequently realised variance.
 
-This check is important because a pricing output can appear plausible even if the underlying density approximation is poor. Density recovery provides a more direct test of the characteristic function, the truncation interval, and the cosine expansion. If the recovered density fails to integrate close to one, then option prices based on the same expansion may not be reliable.
+The W5 results support several stylised facts. VIX rises sharply during stress episodes, realised variance increases after market shocks, and the volatility risk premium is generally positive during calm periods. However, crisis periods may compress or reverse the premium. This behaviour is consistent with the interpretation of volatility as an insurance-like asset class: investors pay for protection in normal periods, while volatility sellers are compensated for bearing crash risk.
 
-\subsection{Convergence in the Number of COS Terms}
+The W5 analysis also identifies the 2020 COVID shock and the 2022 inflation shock as important stress periods. In such regimes, implied volatility rises sharply, realised variance catches up after market moves, and the relationship between VIX changes and SPX returns becomes strongly negative.
 
-The COS convergence study evaluates how the price changes as the number of expansion terms \(N\) increases. A stable COS implementation should show that prices become less sensitive to \(N\) after a sufficiently large number of terms. In the benchmark implementation, \(N=128\) is used as the reported setting.
+\subsection{W6 Calibration Trade-Off}
 
-The number of terms should not be interpreted independently from the truncation interval. Increasing \(N\) improves the resolution of the cosine expansion within the chosen interval, but it does not fix an interval that excludes important probability mass. This is why the W4 validation framework studies both the number of terms and the truncation-width parameter.
+The W6 calibration results show that the one-factor Heston model faces a structural difficulty when fitting both SPX and VIX markets. The SPX-only calibration fits the SPX implied-volatility surface well, with an SPX IV RMSE of \(0.0159\), but produces a VIX futures RMSE of \(5.90\). In contrast, the VIX-only calibration improves the VIX futures RMSE to \(1.32\), but the SPX IV RMSE deteriorates to \(0.0711\).
 
-\subsection{Convergence in the Truncation Width}
+The joint calibration with \(\alpha=0.50\) produces an SPX IV RMSE of \(0.0561\) and a VIX futures RMSE of \(1.33\). This solution is closer to the VIX-only calibration than to the SPX-only calibration, suggesting that the joint objective sacrifices SPX smile fit to preserve the VIX futures fit.
 
-The truncation interval is set as
-\begin{equation}
-a=0,\qquad
-b=\mathbb{E}^{\mathbb{Q}}[v_T]+L\sqrt{\operatorname{Var}^{\mathbb{Q}}(v_T)}.
-\end{equation}
-The lower bound is zero because CIR variance is non-negative. The upper bound depends on the truncation-width parameter \(L\).
+This trade-off is economically meaningful. The SPX volatility smile is strongly influenced by negative stock-variance correlation and volatility-of-volatility. The VIX futures curve is more sensitive to the variance level, long-run variance, and mean-reversion speed. A single variance factor cannot easily satisfy both requirements at once.
 
-The role of \(L\) is to include most of the relevant probability mass of terminal variance. If \(L\) is too small, tail values of \(v_T\) may be excluded. If \(L\) is too large, the cosine expansion is performed over an unnecessarily wide interval. The implementation uses \(L=8\) as a practical benchmark and studies sensitivity to alternative values.
+\subsection{W7 Volatility Surface Analysis}
 
-\subsection{Model-Implied VIX Term Structure}
+The W7 component analyses the structural difference between VIX and SPX implied-volatility surfaces. VIX options are options written on the VIX index itself. Their implied volatility is often interpreted as volatility-of-volatility because it reflects market expectations about the magnitude of future VIX movements.
 
-The W4 implementation also computes a model-implied VIX futures term structure:
-\begin{equation}
-F(0,T)
-=
-\mathbb{E}^{\mathbb{Q}}
-\left[
-100\sqrt{A_\Delta+B_\Delta v_T}
-\right].
-\end{equation}
-This quantity is a futures level, not a discounted derivative price. Therefore, no discount factor appears in the expression.
+Under the CIR variance process, terminal variance \(v_T\) follows a scaled non-central chi-square distribution. Since this distribution is positive and right-skewed, the model-implied VIX inherits a right-skewed distribution. This provides a mathematical explanation for the positive skew observed in VIX option prices.
 
-The shape of the model-implied term structure follows from mean reversion in the CIR variance process. When \(v_0>\theta\), current variance is above its long-run mean, so expected future variance decreases with maturity. This produces a downward-sloping VIX futures curve, associated with backwardation. When \(v_0<\theta\), current variance is below its long-run mean, so expected future variance increases with maturity. This produces an upward-sloping curve, associated with contango.
+The W7 results show that VIX and SPX smiles have opposite skew directions. The VIX smile has positive skew, meaning that out-of-the-money VIX calls are relatively expensive. The SPX smile has negative skew, meaning that out-of-the-money SPX puts are relatively expensive. This contrast is summarised in Table~\ref{tab:w7_smile_comparison}.
 
-This result demonstrates that even a simple one-factor variance process can reproduce basic mean-reversion patterns in the VIX term structure. However, it does not imply that the one-factor model can fit real market VIX futures data accurately across all maturities. Market calibration is left for later stages.
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lll}
+\toprule
+Feature & VIX Options & SPX Options \\
+\midrule
+Skew direction & Positive/right skew & Negative/left skew \\
+Expensive wing & OTM calls & OTM puts \\
+Underlying tail & Fat right tail & Fat left tail \\
+Main crisis exposure & Volatility spikes & Equity drawdowns \\
+Model source & Non-central \(\chi^2\) variance distribution & Negative Heston correlation \(\rho\) \\
+Investor behaviour & VIX calls as tail hedge & SPX puts as downside protection \\
+\bottomrule
+\end{tabular}
+\caption{Structural comparison between VIX and SPX implied-volatility smiles.}
+\label{tab:w7_smile_comparison}
+\end{table}
 
-\subsection{Testing and Completeness}
+The reported one-month VIX 25-delta risk reversal is approximately \(+11.49\) volatility points, while the corresponding SPX 25-delta risk reversal is approximately \(-9.55\) volatility points. The opposite signs confirm the different economic roles of the two option markets. VIX calls insure against volatility spikes, while SPX puts insure against market declines.
 
-The implementation includes tests for several mathematical and numerical components. These include parameter validation, characteristic function boundary conditions, VIX affine mapping, terminal density recovery, non-negativity of option prices, VIX futures positivity, and convergence output structure.
+This result also connects W7 to the earlier Heston model discussion. Negative stock-variance correlation explains the SPX downside skew, while the positive and right-skewed distribution of terminal variance explains the VIX upside skew.
 
-The purpose of these tests is not only to verify that functions run without errors. They also check mathematical properties that should hold regardless of the chosen parameter set. For example, the characteristic function should satisfy
-\begin{equation}
-\varphi(0)=1,
-\end{equation}
-and for real \(u\),
-\begin{equation}
-|\varphi(u)|\leq 1.
-\end{equation}
-Similarly, the recovered density should be non-negative after numerical correction and should integrate approximately to one.
+\subsection{W8 Volatility Risk Premium Backtest}
 
-These checks help ensure that the implementation is mathematically consistent and not merely producing numerical outputs.
+The W8 component evaluates the practical behaviour of a volatility risk premium strategy. The generated outputs include backtest plots, daily and monthly P\&L summaries, regime-level metrics, beta decomposition, and risk dashboards.
 
-\subsection{Overall Discussion}
+Figure~\ref{fig:w8_backtest} shows the cumulative behaviour of the W8 volatility risk premium backtest.
 
-The W3 and W4 results show that the project has a working numerical core. The Monte Carlo engine provides a flexible simulation-based method for realised variance and VIX call pricing. The COS engine provides a faster deterministic method based on the terminal variance characteristic function. Their comparison gives a meaningful cross-validation framework.
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figures/w8_backtest.png}
+    \caption{Backtest performance of the volatility risk premium strategy. The figure summarises the cumulative behaviour of the strategy across the analysed period.}
+    \label{fig:w8_backtest}
+\end{figure}
 
-The current results should be interpreted within the scope of a model-based numerical project. They are not market-calibrated prices, and they do not yet constitute an empirical volatility risk premium study. Instead, they demonstrate that the theoretical formulas, code implementation, and numerical validation are aligned.
+Figure~\ref{fig:w8_daily_pnl} shows the daily P\&L behaviour of the strategy.
 
-This stage prepares the project for the next components: real data collection, model calibration, comparison with market prices, and volatility risk premium backtesting.
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figures/w8_daily_pnl.png}
+    \caption{Daily P\&L of the volatility risk premium strategy. The figure illustrates the time-series behaviour and stress sensitivity of the strategy.}
+    \label{fig:w8_daily_pnl}
+\end{figure}
+
+The W8 metrics are summarised in Table~\ref{tab:w8_vrp_metrics}.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lccc}
+\toprule
+Metric & Full Period & High VRP Regime & Low VRP Regime \\
+\midrule
+Annual return & -- & 2.154 & -- \\
+Annual volatility & 3.925 & 1.218 & 6.102 \\
+Sharpe ratio & -- & 1.768 & -- \\
+Maximum drawdown & -7.664 & 0.000 & -2.763 \\
+VaR 5\% & -0.121 & 0.039 & -0.369 \\
+CVaR 5\% & -3.054 & 0.035 & -4.438 \\
+Skewness & -7.044 & 5.264 & -4.775 \\
+Kurtosis & 53.708 & 27.794 & 22.855 \\
+Observations & 60 & 28 & 23 \\
+\bottomrule
+\end{tabular}
+\caption{W8 volatility risk premium backtest metrics across regimes. Empty entries correspond to metrics not reported in the generated output file.}
+\label{tab:w8_vrp_metrics}
+\end{table}
+
+The high-VRP regime shows the strongest risk-adjusted profile, with a reported Sharpe ratio of approximately \(1.77\), annual return of approximately \(2.15\), and annual volatility of approximately \(1.22\). However, the full-period metrics also show strong negative skewness and high kurtosis, indicating that volatility-selling strategies carry significant tail risk.
+
+Figure~\ref{fig:w8_metrics_dashboard} summarises the W8 strategy metrics visually.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figures/w8_metrics_dashboard.png}
+    \caption{W8 risk and performance dashboard for the volatility risk premium strategy. The dashboard summarises return, volatility, drawdown, and tail-risk behaviour across regimes.}
+    \label{fig:w8_metrics_dashboard}
+\end{figure}
+
+The W8 results are consistent with the economic interpretation developed earlier in the paper. Volatility risk premium strategies can perform well when implied variance is high relative to expected realised variance, but they remain exposed to severe losses during volatility spikes and crisis periods. Therefore, performance evaluation must include not only average returns and Sharpe ratios, but also drawdowns, tail losses, skewness, and regime dependence.
+
+\subsection{Model-Free Hedging Output}
+
+The W8 outputs also include a model-free hedge diagnostic. Figure~\ref{fig:w8_model_free_hedge} summarises the generated hedge output.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.88\textwidth]{figures/w8_model_free_hedge.png}
+    \caption{Model-free hedging diagnostic generated in W8. The figure provides an additional view of strategy risk management and hedge behaviour.}
+    \label{fig:w8_model_free_hedge}
+\end{figure}
+
+The inclusion of hedge diagnostics is important because volatility strategies cannot be evaluated only by their average return. A strategy may appear profitable in normal regimes but fail during volatility spikes if hedging is weak or if tail exposure is not controlled.
+
+\subsection{Integrated Interpretation across W3--W8}
+
+The completed project forms a coherent pipeline. W3 provides a Monte Carlo simulation engine for stochastic variance and VIX-type payoffs. W4 provides a faster COS pricing engine based on the CIR characteristic function. W5 introduces real market data and volatility risk premium estimation. W6 demonstrates the calibration trade-off between SPX and VIX markets. W7 explains the structural difference between SPX and VIX volatility smiles. W8 evaluates the practical risk-return behaviour of a volatility risk premium strategy.
+
+The central conclusion is that volatility can be treated as a tradable asset class, but it requires careful modelling. Simple one-factor stochastic volatility models are useful for theory and implementation, but they face limitations in joint calibration and empirical strategy design. Numerical pricing, calibration, smile analysis, and backtesting must therefore be interpreted together rather than as separate tasks.
